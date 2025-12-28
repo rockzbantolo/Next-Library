@@ -1,0 +1,6 @@
+C:\Users\rocky\source\repos\Vortex\obj\Debug\Vortex.csproj.AssemblyReference.cache
+C:\Users\rocky\source\repos\Vortex\obj\Debug\Vortex.csproj.CoreCompileInputs.cache
+C:\Users\rocky\source\repos\Vortex\bin\Debug\Next.dll
+C:\Users\rocky\source\repos\Vortex\bin\Debug\Next.pdb
+C:\Users\rocky\source\repos\Vortex\obj\Debug\Next.dll
+C:\Users\rocky\source\repos\Vortex\obj\Debug\Next.pdb
