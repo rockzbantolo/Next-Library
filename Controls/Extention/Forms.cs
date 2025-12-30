@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Drawing;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -65,38 +66,66 @@ namespace Next.Controls.Extention
         // ──────────────────────────────────────────────────────────────
         // Replaces content in container with new UserControl (main method)
         // ──────────────────────────────────────────────────────────────
-        public static void LoadUserControl(this UserControl control, Panel container)
+        public static void Show(this UserControl control, Panel container)
         {
             if (container == null) throw new ArgumentNullException(nameof(container));
             if (control == null) throw new ArgumentNullException(nameof(control));
 
-            container.EnabledBuffer();
+            // 1. Early exit if already showing this exact instance
+            if (container.Controls.Count == 1 && ReferenceEquals(container.Controls[0], control))
+                return;
 
-            DrawingSuspension.Suspend(container);
+            container.EnabledBuffer();           // double-buffer the host
+
+            DrawingSuspension.Suspend(container); // WM_SETREDRAW = false
             container.SuspendLayout();
 
             try
             {
-                // Clean up previous UserControls safely
+                // Also double-buffer the incoming control (helps its first paint)
+                control.EnabledBuffer();
+
+                // Clean up previous controls safely
                 for (int i = container.Controls.Count - 1; i >= 0; i--)
                 {
-                    if (container.Controls[i] is UserControl uc)
+                    var child = container.Controls[i];
+                    if (child is UserControl uc)
                     {
                         container.Controls.RemoveAt(i);
-                        uc.Dispose();
+                        // Defer Dispose to avoid potential cross-thread / invalid handle issues
+                        uc.BeginInvoke(new Action(() =>
+                        {
+                            try { uc.Dispose(); } catch { /* already gone */ }
+                        }));
+                    }
+                    else
+                    {
+                        container.Controls.RemoveAt(i);
+                        child?.Dispose();
                     }
                 }
 
                 control.Dock = DockStyle.Fill;
+                control.Visible = true;          // ensure it's visible right after add
+
                 container.Controls.Add(control);
 
-                // One-time post-creation setup
+                // One-time setup
                 control.HandleCreated += OnUserControlHandleCreated;
+            }
+            catch (Exception ex)
+            {
+                // Optional: log in debug – don't swallow in production
+                Debug.WriteLine($"Control failed: {ex.Message}");
             }
             finally
             {
-                container.ResumeLayout(true);
-                DrawingSuspension.Resume(container);
+                container.ResumeLayout(true);     // true = perform layout now
+                DrawingSuspension.Resume(container); // WM_SETREDRAW = true + implicit paint
+
+                // Optional: force clean repaint if you sometimes see stale areas
+                container.Refresh();
+                container.Update();           // flush paint queue
             }
         }
 
@@ -115,7 +144,7 @@ namespace Next.Controls.Extention
         // ──────────────────────────────────────────────────────────────
         // Dimmed background for modal-like dialogs (no leak)
         // ──────────────────────────────────────────────────────────────
-        public static void ShowWithDimmedBackground(this Form dialog, Form owner = null)
+        public static void DimmedBackground(this Form dialog, Form owner = null)
         {
             if (owner == null)
             {

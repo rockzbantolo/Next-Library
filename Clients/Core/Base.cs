@@ -89,7 +89,7 @@ namespace Next.Clients.Core
                     _isHealthy = true;
 
                     // Lightweight logging
-                    Logs.Write(Logger, "OK", Name, $"{op} '{sw.ElapsedMilliseconds}ms'");
+                    //Logs.Write(Logger, "OK", Name, $"{op} '{sw.ElapsedMilliseconds}ms'");
                     return result;
                 }
                 catch (Exception ex) when (i < MaxRetries && IsTransient(ex))
@@ -184,6 +184,25 @@ namespace Next.Clients.Core
 
         public Task<int> ExecuteSpAsync(string proc, object param = null, int? timeoutSec = null)
             => ExecuteWithRetryAsync(c => c.ExecuteAsync(proc, param, commandType: System.Data.CommandType.StoredProcedure, commandTimeout: timeoutSec), "Sp-Execute");
+
+        public async Task TransactAsync(Func<DbConnection, DbTransaction, Task> action, [CallerMemberName] string op = "")
+        {
+            await ExecuteWithRetryAsync(async conn =>
+            {
+                using var tx = conn.BeginTransaction(); // sync transaction creation
+                try
+                {
+                    await action(conn, tx); // async Dapper operations with tx
+                    tx.Commit();
+                }
+                catch
+                {
+                    tx.Rollback();
+                    throw;
+                }
+                return true;
+            }, op);
+        }
 
         /// <summary>
         /// Abstract method for full DB backup. Must be implemented per provider.

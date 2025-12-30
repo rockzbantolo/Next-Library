@@ -7,10 +7,6 @@ using System.Windows.Forms;
 
 namespace Next.Controls
 {
-    ///<summary>
-    /// Add this to InitializedComponents - RadiusProvider = new RadiusProvider();
-    /// Call this in the Class - private RadiusProvider RadiusProvider;
-    ///</summary>
     [ToolboxItem(true)]
     [ProvideProperty("Radius", typeof(Control))]
     [ProvideProperty("BorderColor", typeof(Control))]
@@ -22,13 +18,14 @@ namespace Next.Controls
             public int Radius;
             public Color BorderColor = Color.Black;
             public int BorderWidth = 1;
-            public GraphicsPath Path;
+            public GraphicsPath CachedPath;
             public Rectangle LastBounds;
+            public bool IsPainting;
         }
 
         private readonly ConditionalWeakTable<Control, RadiusProps> _map = new();
 
-        // Debounce support for designer performance
+        // Debounce timer for designer
         private Timer _updateTimer;
         private Control _pendingControl;
         private RadiusProps _pendingProps;
@@ -47,11 +44,8 @@ namespace Next.Controls
             var p = Get(c);
             value = Math.Max(0, value);
             if (p.Radius == value) return;
-
             p.Radius = value;
             Hook(c);
-
-            // Debounce expensive update in designer / rapid changes
             ScheduleUpdate(c, p);
         }
 
@@ -66,7 +60,6 @@ namespace Next.Controls
         {
             var p = Get(c);
             if (p.BorderColor == value) return;
-
             p.BorderColor = value;
             c.Invalidate();
         }
@@ -83,14 +76,12 @@ namespace Next.Controls
             var p = Get(c);
             value = Math.Max(0, value);
             if (p.BorderWidth == value) return;
-
             p.BorderWidth = value;
             ScheduleUpdate(c, p);
         }
 
         // ── Core ────────────────────────────────────────────────────────────────
-        private RadiusProps Get(Control c) =>
-            _map.GetValue(c, _ => new RadiusProps());
+        private RadiusProps Get(Control c) => _map.GetValue(c, _ => new RadiusProps());
 
         private void Hook(Control c)
         {
@@ -110,11 +101,10 @@ namespace Next.Controls
             if (sender is not Control c) return;
             if (!_map.TryGetValue(c, out var p)) return;
 
-            p.Path?.Dispose();
+            p.CachedPath?.Dispose();
             c.Region?.Dispose();
             _map.Remove(c);
 
-            // Clean up pending update if control is being disposed
             if (_pendingControl == c)
             {
                 _pendingControl = null;
@@ -126,6 +116,7 @@ namespace Next.Controls
         {
             if (sender is not Control c) return;
             if (!_map.TryGetValue(c, out var p)) return;
+            if (p.IsPainting) return;
 
             UpdateRegionAndPath(c, p);
             c.Invalidate();
@@ -135,17 +126,28 @@ namespace Next.Controls
         {
             if (sender is not Control c) return;
             if (!_map.TryGetValue(c, out var p)) return;
-            if (p.Path == null || p.BorderWidth <= 0) return;
+            if (p.CachedPath == null || p.BorderWidth <= 0) return;
 
-            var g = e.Graphics;
-            g.SmoothingMode = SmoothingMode.AntiAlias;
-
-            using var pen = new Pen(p.BorderColor, p.BorderWidth)
+            p.IsPainting = true;
+            try
             {
-                Alignment = PenAlignment.Inset
-            };
+                var g = e.Graphics;
+                // High-quality rendering for smoother borders & corners
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                g.PixelOffsetMode = PixelOffsetMode.HighQuality;
+                g.CompositingQuality = CompositingQuality.HighQuality;
+                g.InterpolationMode = InterpolationMode.HighQualityBicubic;
 
-            g.DrawPath(pen, p.Path);
+                using var pen = new Pen(p.BorderColor, p.BorderWidth)
+                {
+                    Alignment = PenAlignment.Inset
+                };
+                g.DrawPath(pen, p.CachedPath);
+            }
+            finally
+            {
+                p.IsPainting = false;
+            }
         }
 
         // ── Debounced Update ────────────────────────────────────────────────────
@@ -153,23 +155,18 @@ namespace Next.Controls
         {
             if (LicenseManager.UsageMode == LicenseUsageMode.Designtime)
             {
-                // In designer → debounce
                 if (_updateTimer == null)
                 {
-                    _updateTimer = new Timer();
-                    _updateTimer.Interval = 180; // 180 ms – feels responsive but reduces spam
+                    _updateTimer = new Timer { Interval = 180 };
                     _updateTimer.Tick += Timer_Tick;
                 }
-
                 _pendingControl = c;
                 _pendingProps = p;
-
                 _updateTimer.Stop();
                 _updateTimer.Start();
             }
             else
             {
-                // Runtime → apply immediately
                 UpdateRegionAndPath(c, p);
                 c.Invalidate();
             }
@@ -178,13 +175,11 @@ namespace Next.Controls
         private void Timer_Tick(object sender, EventArgs e)
         {
             _updateTimer?.Stop();
-
             if (_pendingControl != null && _pendingProps != null)
             {
                 UpdateRegionAndPath(_pendingControl, _pendingProps);
                 _pendingControl.Invalidate();
             }
-
             _pendingControl = null;
             _pendingProps = null;
         }
@@ -192,61 +187,104 @@ namespace Next.Controls
         private void UpdateRegionAndPath(Control c, RadiusProps p)
         {
             var currentRect = c.ClientRectangle;
-            if (currentRect == p.LastBounds && p.Path != null)
+            if (currentRect == p.LastBounds && p.CachedPath != null)
                 return;
 
-            p.Path?.Dispose();
-            p.Path = CreateRoundedPath(currentRect, p.Radius, p.BorderWidth);
+            p.CachedPath?.Dispose();
+            p.CachedPath = CreateSmoothRoundedPath(currentRect, p.Radius, p.BorderWidth);
             p.LastBounds = currentRect;
 
             if (c.Visible)
             {
                 c.Region?.Dispose();
-                c.Region = new Region(p.Path);
+                c.Region = new Region(p.CachedPath);
             }
         }
 
-        // ── Path Creation ───────────────────────────────────────────────────────
-        private static GraphicsPath CreateRoundedPath(Rectangle r, int radius, int border)
+        // ── Smooth Bezier-based Rounded Path (with proper inset fix) ────────────
+        private static GraphicsPath CreateSmoothRoundedPath(Rectangle bounds, int radius, int borderWidth)
         {
             var path = new GraphicsPath();
 
-            if (r.Width <= 0 || r.Height <= 0)
+            if (bounds.Width <= 0 || bounds.Height <= 0)
             {
-                path.AddRectangle(r);
+                path.AddRectangle(bounds);
                 return path;
             }
 
-            var drawRect = r;
-            if (border > 0)
-                drawRect.Inflate(-border / 2, -border / 2);
+            // Full inset offset → Inset pen draws fully visible border (no right/bottom clipping)
+            int offset = borderWidth;
+            var inner = new Rectangle(
+                bounds.X + offset,
+                bounds.Y + offset,
+                bounds.Width - 2 * offset,
+                bounds.Height - 2 * offset
+            );
 
-            radius = Math.Min(radius, Math.Min(drawRect.Width, drawRect.Height) / 2);
+            if (inner.Width <= 0 || inner.Height <= 0)
+            {
+                path.AddRectangle(bounds);
+                return path;
+            }
+
+            radius = Math.Max(0, Math.Min(radius, Math.Min(inner.Width, inner.Height) / 2));
 
             if (radius <= 0)
             {
-                path.AddRectangle(drawRect);
+                path.AddRectangle(inner);
                 return path;
             }
 
             int diameter = radius * 2;
+            int left = inner.Left;
+            int top = inner.Top;
+            int right = inner.Right;
+            int bottom = inner.Bottom;
 
-            path.AddArc(drawRect.Left, drawRect.Top, diameter, diameter, 180, 90);
-            path.AddArc(drawRect.Right - diameter, drawRect.Top, diameter, diameter, 270, 90);
-            path.AddArc(drawRect.Right - diameter, drawRect.Bottom - diameter, diameter, diameter, 0, 90);
-            path.AddArc(drawRect.Left, drawRect.Bottom - diameter, diameter, diameter, 90, 90);
+            // Top-left
+            path.AddBezier(left, top + radius,
+                           left, top + radius / 2,
+                           left + radius / 2, top,
+                           left + radius, top);
+
+            // Top
+            path.AddLine(left + radius, top, right - radius, top);
+
+            // Top-right
+            path.AddBezier(right - radius, top,
+                           right - radius / 2, top,
+                           right, top + radius / 2,
+                           right, top + radius);
+
+            // Right
+            path.AddLine(right, top + radius, right, bottom - radius);
+
+            // Bottom-right
+            path.AddBezier(right, bottom - radius,
+                           right, bottom - radius / 2,
+                           right - radius / 2, bottom,
+                           right - radius, bottom);
+
+            // Bottom
+            path.AddLine(right - radius, bottom, left + radius, bottom);
+
+            // Bottom-left
+            path.AddBezier(left + radius, bottom,
+                           left + radius / 2, bottom,
+                           left, bottom - radius / 2,
+                           left, bottom - radius);
+
+            // Left (close)
+            path.AddLine(left, bottom - radius, left, top + radius);
 
             path.CloseFigure();
             return path;
         }
 
-        // ── Double Buffering ────────────────────────────────────────────────────
         private static void EnableDoubleBuffer(Control c)
         {
             var pi = c.GetType().GetProperty("DoubleBuffered",
-                System.Reflection.BindingFlags.Instance |
-                System.Reflection.BindingFlags.NonPublic);
-
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
             pi?.SetValue(c, true);
         }
 
@@ -255,7 +293,6 @@ namespace Next.Controls
             if (disposing)
             {
                 _updateTimer?.Dispose();
-                _updateTimer = null;
             }
             base.Dispose(disposing);
         }

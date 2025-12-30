@@ -171,6 +171,8 @@
     <Compile Include="Common\AppSettings.cs" />
     <Compile Include="Common\Return.cs" />
     <Compile Include="Controls\Extention\DataTables.cs" />
+    <Compile Include="Controls\Extention\Labels.cs" />
+    <Compile Include="Controls\Extention\Radius.cs" />
     <Compile Include="Extentions\App.cs" />
     <Compile Include="Controls\Extention\Buttons.cs" />
     <Compile Include="Controls\Extention\Textbox.cs" />
@@ -192,7 +194,7 @@
     <Compile Include="Services\Sms.cs" />
     <Compile Include="Common\Excel.cs" />
     <Compile Include="Common\Notifications.cs" />
-    <Compile Include="Controls\Radius.cs">
+    <Compile Include="Controls\RadiusProvider.cs">
       <SubType>Component</SubType>
     </Compile>
     <Compile Include="Properties\AssemblyInfo.cs" />

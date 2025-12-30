@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Data.Common;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 
 namespace Next.Clients
@@ -16,5 +18,6 @@ namespace Next.Clients
         Task<T> QuerySpFirstAsync<T>(string proc, object param = null, int? timeoutSec = null);
         Task<int> ExecuteSpAsync(string proc, object param = null, int? timeoutSec = null);
         Task<bool> CreateFullBackupAsync(string filePath);
+        Task TransactAsync(Func<DbConnection, DbTransaction, Task> action, [CallerMemberName] string op = "");
     }
 }
