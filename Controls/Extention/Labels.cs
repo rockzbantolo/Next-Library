@@ -394,69 +394,67 @@ namespace Next.Controls.Extention
             }
 
             private static async Task BindDataToLabelWithLoaderAsync(
-                    DataTable table,
-                    string keyColumn,
-                    IDictionary<string, List<LabelBinding>> rowMap,
-                    int revealDelayMs,
-                    NullDisplayMode defaultNullDisplay,
-                    Action<IDictionary<string, long>> onTotals)
+                DataTable table,
+                string keyColumn,
+                IDictionary<string, List<LabelBinding>> rowMap,
+                int revealDelayMs,
+                NullDisplayMode defaultNullDisplay,
+                Action<IDictionary<string, long>> onTotals)
+            {
+                if (table == null || rowMap == null || rowMap.Count == 0)
+                    return;
+
+                // Show loading
+                foreach (var bindings in rowMap.Values)
+                    foreach (var b in bindings)
+                        b.Target.SetLoading(true);
+
+                if (revealDelayMs > 0)
+                    await Task.Delay(revealDelayMs);
+
+                var totals = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+
+                foreach (DataRow row in table.Rows)
                 {
-                    if (table == null || rowMap == null || rowMap.Count == 0)
-                        return;
+                    string key = row[keyColumn]?.ToString();
+                    if (string.IsNullOrEmpty(key)) continue;
 
-                    // Start loading
-                    foreach (var bindings in rowMap.Values)
-                        foreach (var b in bindings)
-                            b.Target.SetLoading(true);
+                    if (!rowMap.TryGetValue(key, out var bindings) || bindings == null)
+                        continue;
 
-                    if (revealDelayMs > 0)
-                        await Task.Delay(revealDelayMs);
-
-                    var totals = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
-
-                    foreach (DataRow row in table.Rows)
+                    foreach (var b in bindings)
                     {
-                        string key = row[keyColumn]?.ToString();
-                        if (string.IsNullOrEmpty(key)) continue;
+                        object dbValue = row[b.ColumnName];
 
-                        if (!rowMap.TryGetValue(key, out var bindings) || bindings == null)
-                            continue;
+                        string displayText = (dbValue == null || dbValue == DBNull.Value)
+                            ? GetNullDisplayText(b.NullDisplay ?? defaultNullDisplay, b.CustomNullText)
+                            : dbValue.ToString();
 
-                        foreach (var b in bindings)
+                        // Apply format only if numeric and format exists
+                        if (!string.IsNullOrEmpty(b.FormatString) && long.TryParse(dbValue?.ToString(), out long num))
                         {
-                            object dbValue = row[b.ColumnName];
-                            long value = 0;
-                            string displayText;
+                            displayText = num.ToString(b.FormatString);
+                        }
 
-                            if (dbValue == null || dbValue == DBNull.Value)
-                            {
-                                displayText = GetNullDisplayText(b.NullDisplay ?? defaultNullDisplay, b.CustomNullText);
-                            }
-                            else if (long.TryParse(dbValue.ToString(), out value))
-                            {
-                                displayText = b.FormatString != null ? value.ToString(b.FormatString) : value.ToString();
-                            }
-                            else
-                            {
-                                value = 0;
-                                displayText = "–";
-                            }
+                        b.Target.Text = displayText;
 
-                            b.Target.Text = displayText;
-
+                        // Accumulate total only if numeric
+                        if (long.TryParse(dbValue?.ToString() ?? "0", out long value))
+                        {
                             totals[b.ColumnName] = totals.TryGetValue(b.ColumnName, out long acc) ? acc + value : value;
                         }
                     }
-
-                    onTotals?.Invoke(totals);
-
-                    // Stop loading
-                    foreach (var bindings in rowMap.Values)
-                        foreach (var b in bindings)
-                            b.Target.SetLoading(false);
                 }
 
-            public static List<LabelBinding> BindGroupLabel(
+                onTotals?.Invoke(totals);
+
+                // Hide loading
+                foreach (var bindings in rowMap.Values)
+                    foreach (var b in bindings)
+                        b.Target.SetLoading(false);
+            }
+
+        public static List<LabelBinding> BindGroupLabel(
                 IReadOnlyList<string> columns,
                 params Label[] labels)
             {

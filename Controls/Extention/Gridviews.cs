@@ -820,12 +820,13 @@ namespace Next.Controls.Extention
                     skeletonBaseColor: skeletonBaseColor,
                     skeletonHighlightColor: skeletonHighlightColor);
 
+                dgv.Rows.Clear();
+
                 try
                 {
                     var minimumDelayTask = Task.Delay(minSpinnerMilliseconds);
                     var data = await dataTask;
                     await minimumDelayTask;
-
                     var result = dgv.BindData(data);
 
                     if (dgv.Rows.Count == 0)
@@ -860,7 +861,7 @@ namespace Next.Controls.Extention
 
                 public GridLoaderBatch Add(
                     DataGridView grid,
-                    Task<DataTable?> dataTask,
+                    Task<DataTable> dataTask,
                     string loading,
                     string empty)
                 {

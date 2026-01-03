@@ -1,100 +1,38 @@
-﻿using System;
-using System.IO;
+﻿using Serilog;
+using System;
 using System.Runtime.CompilerServices;
-using System.Text;
+
 
 namespace Next.Common
-
 {
     public static class Logger
     {
-        public static bool IsDevelopmentMode { get; set; } = true;
+        private static readonly ILogger _log;
 
-        public static void Trace(string message, bool? isDev = null,
-            [CallerMemberName] string caller = null,
-            [CallerFilePath] string file = null,
-            [CallerLineNumber] int line = 0)
+        static Logger()
         {
-            if (!(isDev ?? IsDevelopmentMode)) return;
-            WriteLogs("TRACE", message, caller, file, line);
+            _log = new LoggerConfiguration()
+                .MinimumLevel.Verbose()
+                .Enrich.FromLogContext()
+                .WriteTo.Console(outputTemplate: "[{Level:u3}] {Timestamp:HH:mm:ss.fff} {SourceContext} → {Message:lj}{NewLine}{Exception}")
+                .WriteTo.Debug()
+                .CreateLogger();
         }
 
-        public static void Info(string message, bool? isDev = null,
-            [CallerMemberName] string caller = null,
-            [CallerFilePath] string file = null,
-            [CallerLineNumber] int line = 0)
-        {
-            if (!(isDev ?? IsDevelopmentMode)) return;
-            WriteLogs("INFO", message, caller, file, line);
-        }
+        public static void Trace(string msg, [CallerMemberName] string member = "")
+            => _log.Verbose("{Member} → {Msg}", member, msg);
 
-        public static void Warn(string message, bool? isDev = null,
-            [CallerMemberName] string caller = null,
-            [CallerFilePath] string file = null,
-            [CallerLineNumber] int line = 0)
-        {
-            if (!(isDev ?? IsDevelopmentMode)) return;
-            WriteLogs("WARN", message, caller, file, line);
-        }
+        public static void Debug(string msg, [CallerMemberName] string member = "")
+            => _log.Debug("{Member} → {Msg}", member, msg);
 
-        public static void Error(string message, Exception ex = null, bool? isDev = null,
-            [CallerMemberName] string caller = null,
-            [CallerFilePath] string file = null,
-            [CallerLineNumber] int line = 0)
-        {
-            if (!(isDev ?? IsDevelopmentMode)) return;
+        public static void Info(string msg, [CallerMemberName] string member = "")
+            => _log.Information("{Member} → {Msg}", member, msg);
 
-            var sb = new StringBuilder();
-            sb.AppendLine(message);
+        public static void Warn(string msg, [CallerMemberName] string member = "")
+            => _log.Warning("{Member} → {Msg}", member, msg);
 
-            if (ex != null)
-            {
-                sb.AppendLine($">[Reason]   : {ex.InnerException?.InnerException?.Message ?? ex.InnerException?.Message ?? ex.Message}");
-                sb.AppendLine($">[Exception]: {ex.GetType().Name} - {ex.Message}");
+        public static void Error(string msg, Exception ex = null, [CallerMemberName] string member = "")
+            => _log.Error(ex, "{Member} → {Msg}", member, msg);
 
-                int depth = 1;
-                var inner = ex.InnerException;
-                while (inner != null)
-                {
-                    sb.AppendLine($" - [Inner#{depth}]    : {inner.GetType().Name} - {inner.Message}");
-                    inner = inner.InnerException;
-                    depth++;
-                }
-
-                sb.AppendLine(" - [StackTrace] :");
-                sb.AppendLine(ex.StackTrace);
-            }
-
-            WriteErrorLog("ERROR", sb.ToString(), caller, file, line);
-        }
-
-        public static void Debug(string message, bool? isDev = null,
-            [CallerMemberName] string caller = null,
-            [CallerFilePath] string file = null,
-            [CallerLineNumber] int line = 0)
-        {
-            if (!(isDev ?? IsDevelopmentMode)) return;
-            WriteLogs("DEBUG", message, caller, file, line);
-        }
-
-        private static void WriteLogs(string level, string message, string caller, string file, int line)
-        {
-            string fileName = Path.GetFileName(file);
-            string folderName = Path.GetFileName(Path.GetDirectoryName(file));
-            Console.WriteLine($"[{level}].[{DateTime.Now:MM-dd-yyyy HH:mm:ss}].[{caller}].[{folderName}/{fileName}:{line}] - {message}");
-        }
-
-        private static void WriteErrorLog(string level, string message, string caller, string file, int line)
-        {
-            string timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
-            string fileName = Path.GetFileName(file);
-            string folderName = Path.GetFileName(Path.GetDirectoryName(file));
-
-            Console.WriteLine($"\n>[{level}]-[Timestamp] : {timestamp} --------------------------------------------------");
-            Console.WriteLine($">[Method]   : {caller}");
-            Console.WriteLine($">[Location] : {folderName}/{fileName}:{line}");
-            Console.WriteLine($">[Message]  : {message}");
-            Console.WriteLine($">-------------------------------------------------------------------------------------------");
-        }
     }
 }

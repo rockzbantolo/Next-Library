@@ -1,226 +1,410 @@
 ﻿using Dapper;
+using Microsoft.Extensions.Logging;
+using MySql.Data.MySqlClient;
+using Npgsql;
+using Polly;
+using Polly.CircuitBreaker;
+using Polly.Retry;
 using System;
 using System.Collections.Generic;
 using System.Data.Common;
 using System.Diagnostics;
 using System.Linq;
-using System.Net.Http;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace Next.Clients.Core
 {
-    public abstract class Base : IDatabase
+    public abstract class Base : IDatabase, IDisposable
     {
-        // Core properties
+        // --------------------------------------------------------------------
+        // Core fields
+        // --------------------------------------------------------------------
         protected readonly DbProviderFactory Factory;
         protected readonly string ConnectionString;
         public readonly Action<string> Logger;
-
-        private const int MaxRetries = 5;
-        private static readonly TimeSpan BaseDelay = TimeSpan.FromMilliseconds(250);
-        private static readonly ThreadLocal<Random> Rng = new(() =>
-            new Random(unchecked((int)(Environment.TickCount ^ Thread.CurrentThread.ManagedThreadId))));
-
+        private readonly ILogger _structuredLogger;
+        private readonly ResiliencePipeline _pipeline;
         private readonly CancellationTokenSource _cts = new();
-        private Task _healthTask;
+        private readonly Task _healthTask;
         private volatile bool _isHealthy = true;
         private DateTime _lastSuccessUtc = DateTime.UtcNow;
+
+        // --------------------------------------------------------------------
+        // Monitoring counters (public for external health checks / dashboards)
+        // --------------------------------------------------------------------
+        public long SuccessfulOperations { get; private set; }
+        public long FailedOperations { get; private set; }
+        public long TotalRetries { get; private set; }
 
         public string Name { get; }
         public bool IsHealthy => _isHealthy && (DateTime.UtcNow - _lastSuccessUtc) < TimeSpan.FromMinutes(10);
         public TimeSpan HealthCheckInterval { get; set; } = TimeSpan.FromMinutes(2);
+        public string HealthCheckSql { get; }
 
-        /// <summary>
-        /// Initializes the base client with provider, connection string, and logger.
-        /// </summary>
-        protected Base(DbProviderFactory factory, string connectionString, string name, Action<string> logger)
+        // --------------------------------------------------------------------
+        // Constructor with full configurability
+        // --------------------------------------------------------------------
+        protected Base(
+            DbProviderFactory factory,
+            string connectionString,
+            string name,
+            Action<string> logger = null,
+            ILogger structuredLogger = null,
+            int? maxRetryAttempts = null,
+            TimeSpan? baseRetryDelay = null,
+            TimeSpan? operationTimeout = null,
+            TimeSpan? circuitBreakDuration = null,
+            double? circuitBreakerFailureRatio = null,
+            int? circuitBreakerMinimumThroughput = null,
+            string healthCheckSql = null)
         {
             Factory = factory ?? throw new ArgumentNullException(nameof(factory));
             ConnectionString = connectionString ?? throw new ArgumentNullException(nameof(connectionString));
             Name = string.IsNullOrWhiteSpace(name) ? "DB" : name.Trim();
-            Logger = logger ?? (msg => Debug.WriteLine(msg));
 
-            // Log initialization
-            Logs.Write(Logger, "Initialized", Name, $"Created {GetType().Name}");
+            Logger = logger ?? (m => Debug.WriteLine($"[{Name}] {m}"));
+            _structuredLogger = structuredLogger;
 
-            // Start background health monitor
+            // --------------------------------------------------------------------
+            // Default Values
+            // --------------------------------------------------------------------
+            int retries = maxRetryAttempts ?? 5;
+            TimeSpan retryDelay = baseRetryDelay ?? TimeSpan.FromMilliseconds(250);
+            TimeSpan timeout = operationTimeout ?? TimeSpan.FromSeconds(45);
+            TimeSpan breakDuration = circuitBreakDuration ?? TimeSpan.FromMinutes(2);
+            double failureRatio = circuitBreakerFailureRatio ?? 0.5;
+            int minThroughput = circuitBreakerMinimumThroughput ?? 10;
+
+            HealthCheckSql = healthCheckSql ?? "SELECT 1";
+
+            _pipeline = new ResiliencePipelineBuilder()
+                .AddRetry(new RetryStrategyOptions
+                {
+                    MaxRetryAttempts = retries,
+                    Delay = retryDelay,
+                    BackoffType = DelayBackoffType.Exponential,
+                    UseJitter = true,
+                    ShouldHandle = new PredicateBuilder().Handle<Exception>(IsTransientException),
+                    OnRetry = args =>
+                    {
+                        TotalRetries++;
+                        LogOperation("Retry", 0, false, $"Attempt {args.AttemptNumber}");
+                        return default;
+                    }
+                })
+                .AddTimeout(timeout)
+                .AddCircuitBreaker(new CircuitBreakerStrategyOptions
+                {
+                    FailureRatio = failureRatio,
+                    MinimumThroughput = minThroughput,
+                    BreakDuration = breakDuration,
+                    ShouldHandle = new PredicateBuilder().Handle<Exception>(IsTransientException),
+                    OnOpened = args =>
+                    {
+                        LogOperation("Circuit", 0, false, $"Opened for {args.BreakDuration.TotalSeconds}s");
+                        return default;
+                    },
+                    OnClosed = _ =>
+                    {
+                        LogOperation("Circuit", 0, true, "Reset");
+                        return default;
+                    },
+                    OnHalfOpened = _ =>
+                    {
+                        LogOperation("Circuit", 0, true, "Half-open");
+                        return default;
+                    }
+                })
+                .Build();
+
+            LogOperation("Initialized", 0, true, $"Retries({retries}), Timeout({timeout.TotalSeconds})s, Break({breakDuration.TotalMinutes})min");
+
             _healthTask = Task.Run(HealthMonitorAsync);
         }
 
-        /// <summary>
-        /// Creates a new connection instance from the provider factory.
-        /// </summary>
+        // --------------------------------------------------------------------
+        // Connection creation
+        // --------------------------------------------------------------------
         private DbConnection CreateConnection()
         {
-            var conn = Factory.CreateConnection();
-            if (conn == null) throw new InvalidOperationException("Factory failed to create connection");
+            var conn = Factory.CreateConnection() ?? throw new InvalidOperationException("Failed to create connection");
             conn.ConnectionString = ConnectionString;
             return conn;
         }
 
-        /// <summary>
-        /// Executes a database operation with retries, transient detection, and logging.
-        /// </summary>
-        protected async Task<T> ExecuteWithRetryAsync<T>(Func<DbConnection, Task<T>> action, [CallerMemberName] string op = "")
+        // --------------------------------------------------------------------
+        // Transient exception detection (extensible)
+        // --------------------------------------------------------------------
+        protected virtual bool IsTransientException(Exception ex)
         {
-            Exception lastEx = null;
-
-            if (!await HasInternetAsync().ConfigureAwait(false))
-                throw new DbException("No internet connection – aborting database operation");
-
-            for (int i = 0; i <= MaxRetries; i++)
+            if (ex is TimeoutException or TaskCanceledException)
+                return true;
+            string msg = ex.Message;
+            if (msg.Contains("TIMEOUT", StringComparison.OrdinalIgnoreCase) ||
+            msg.Contains("TRANSIENT", StringComparison.OrdinalIgnoreCase) ||
+            msg.Contains("DEADLOCK", StringComparison.OrdinalIgnoreCase) ||
+            msg.Contains("CONNECTION", StringComparison.OrdinalIgnoreCase) ||
+            msg.Contains("GONE AWAY", StringComparison.OrdinalIgnoreCase) ||
+            msg.Contains("TOO MANY CONNECTIONS", StringComparison.OrdinalIgnoreCase))
+                return true;
+            if (ex.InnerException is { } inner)
             {
-                DbConnection conn = null;
-                Stopwatch sw = null;
-
-                try
-                {
-                    conn = CreateConnection();
-                    await conn.OpenAsync(_cts.Token).ConfigureAwait(false);
-
-                    // Only start stopwatch around actual DB operation
-                    sw = Stopwatch.StartNew();
-                    var result = await action(conn).ConfigureAwait(false);
-                    sw.Stop();
-
-                    _lastSuccessUtc = DateTime.UtcNow;
-                    _isHealthy = true;
-
-                    // Lightweight logging
-                    //Logs.Write(Logger, "OK", Name, $"{op} '{sw.ElapsedMilliseconds}ms'");
-                    return result;
-                }
-                catch (Exception ex) when (i < MaxRetries && IsTransient(ex))
-                {
-                    lastEx = ex;
-                    var delay = TimeSpan.FromMilliseconds(Rng.Value.NextDouble() * Math.Pow(2, i) * BaseDelay.TotalMilliseconds);
-                    Logs.Write(Logger, "Retry", Name, $"Attempt {i + 1}/{MaxRetries} → {ex.GetType().Name}: {ex.Message} (wait '{delay.TotalMilliseconds:F0}ms')");
-                    await Task.Delay(delay, _cts.Token).ConfigureAwait(false);
-                }
-                catch (Exception ex)
-                {
-                    if (sw != null) sw.Stop();
-                    _isHealthy = false;
-                    Logs.Write(Logger, "Fail", Name, $"{op} '{sw?.ElapsedMilliseconds ?? 0}ms' → {ex}");
-                    throw;
-                }
-                finally
-                {
-                    if (conn != null)
-                    {
-                        try { conn.Close(); } catch { }
-                        try { conn.Dispose(); } catch { }
-                    }
-                }
+                if (inner is System.Data.SqlClient.SqlException sqlEx &&
+                new[] { 4060, 40197, 40501, 49918, 49919, 49920 }.Contains(sqlEx.Number))
+                    return true;
+                if (inner is MySql.Data.MySqlClient.MySqlException mysqlEx &&
+                new[] { 2006, 2013, 2055 }.Contains(mysqlEx.Number))
+                    return true;
+                if (inner is Npgsql.PostgresException pgEx &&
+                new[] { "08006", "57P01", "57P02", "57P03", "53300" }.Contains(pgEx.SqlState))
+                    return true;
             }
+            return false;
+        }
 
-            _isHealthy = false;
-            throw new DbException($"Database '{Name}' failed after {MaxRetries} retries", lastEx);
+        // --------------------------------------------------------------------
+        // Core execution with resilience
+        // --------------------------------------------------------------------
+        protected async Task<T> ExecuteWithRetryAsync<T>(
+            Func<DbConnection, CancellationToken, Task<T>> action,
+            [CallerMemberName] string operationName = "",
+            Func<T, string> logDetail = null)
+        {
+            var sw = Stopwatch.StartNew();
+
+            try
+            {
+                var result = await _pipeline.ExecuteAsync(async token =>
+                {
+                    using var conn = CreateConnection();
+                    await conn.OpenAsync(token).ConfigureAwait(false);
+                    return await action(conn, token).ConfigureAwait(false);
+                }, _cts.Token);
+
+                sw.Stop();
+                _lastSuccessUtc = DateTime.UtcNow;
+                _isHealthy = true;
+                SuccessfulOperations++;
+
+                string detail = logDetail != null ? logDetail(result) : null;
+                LogOperation(operationName, sw.ElapsedMilliseconds, true, detail);
+
+                return result;
+            }
+            catch (Exception ex)
+            {
+                sw.Stop();
+                _isHealthy = false;
+                FailedOperations++;
+
+                LogOperation(operationName, sw.ElapsedMilliseconds, false, ex.Message);
+
+                if (IsFatalConnectionError(ex))
+                    ClearPools();
+
+                throw new DbException($"Database '{Name}' operation '{operationName}' failed", ex);
+            }
         }
 
 
-        /// <summary>
-        /// Determines whether an exception is transient and should be retried.
-        /// Improvement: override in provider-specific derived classes for better detection.
-        /// </summary>
-        protected virtual bool IsTransient(Exception ex) =>
-            ex is TimeoutException ||
-            ex.Message.Contains("timeout", StringComparison.OrdinalIgnoreCase) ||
-            ex.Message.Contains("connection", StringComparison.OrdinalIgnoreCase) ||
-            ex.Message.Contains("transient", StringComparison.OrdinalIgnoreCase);
-
-        /// <summary>
-        /// Checks internet availability before attempting a DB operation.
-        /// </summary>
-        private async Task<bool> HasInternetAsync()
+        // --------------------------------------------------------------------
+        // Connection pool clearing on fatal errors
+        // --------------------------------------------------------------------
+        private void ClearPools()
         {
             try
             {
-                using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(3) };
-                var resp = await client.GetAsync("https://1.1.1.1").ConfigureAwait(false);
-                return resp.IsSuccessStatusCode;
+                if (Factory is System.Data.SqlClient.SqlClientFactory)
+                    System.Data.SqlClient.SqlConnection.ClearAllPools();
+                else if (Factory is Microsoft.Data.SqlClient.SqlClientFactory)
+                    Microsoft.Data.SqlClient.SqlConnection.ClearAllPools();
+                else if (Factory is MySqlClientFactory)
+                    MySqlConnection.ClearAllPools();
+                else if (Factory is NpgsqlFactory)
+                    NpgsqlConnection.ClearAllPools();
+
+                LogOperation("Pool", 0, false, "Cleared connection pools");
             }
-            catch { return false; }
+            catch { }
         }
 
-        /// <summary>
-        /// Background health monitor to periodically verify DB connectivity.
-        /// Improvement: reduces risk of silent failures in long-running apps.
-        /// </summary>
+        private static bool IsFatalConnectionError(Exception ex)
+        {
+            string msg = ex.Message.ToUpperInvariant();
+            return msg.Contains("SSL") ||
+                   msg.Contains("ENCRYPTION") ||
+                   msg.Contains("PRELOGIN") ||
+                   msg.Contains("PROVIDER") ||
+                   msg.Contains("NETWORK");
+        }
+
+        // --------------------------------------------------------------------
+        // Background health monitoring
+        // --------------------------------------------------------------------
         private async Task HealthMonitorAsync()
         {
             while (!_cts.IsCancellationRequested)
             {
+                await Task.Delay(HealthCheckInterval, _cts.Token).ConfigureAwait(false);
+
+                if (DateTime.UtcNow - _lastSuccessUtc < HealthCheckInterval + TimeSpan.FromMinutes(1))
+                    continue;
+
                 try
                 {
-                    await Task.Delay(HealthCheckInterval, _cts.Token);
-
-                    if (DateTime.UtcNow - _lastSuccessUtc > HealthCheckInterval + TimeSpan.FromMinutes(1))
-                        await ExecuteWithRetryAsync(c => c.ExecuteAsync("SELECT 1"), "HEALTH_CHECK");
+                    await ExecuteWithRetryAsync(async (c, ct) =>
+                    {
+                        await c.ExecuteAsync(HealthCheckSql);
+                        return true;
+                    }, "HEALTH_CHECK");
                 }
-                catch { /* ignore */ }
+                catch { }
             }
         }
 
         // --------------------------------------------------------------------
-        // Dapper API
+        // Manual health check (public API)
         // --------------------------------------------------------------------
-        public Task<IEnumerable<T>> QueryAsync<T>(string sql, object param = null, int? timeoutSec = null)
-            => ExecuteWithRetryAsync(c => c.QueryAsync<T>(sql, param, commandTimeout: timeoutSec), "Query");
-
-        public Task<T> QueryFirstOrDefaultAsync<T>(string sql, object param = null, int? timeoutSec = null)
-            => ExecuteWithRetryAsync(c => c.QueryFirstOrDefaultAsync<T>(sql, param, commandTimeout: timeoutSec), "Query-First");
-
-        public Task<int> ExecuteAsync(string sql, object param = null, int? timeoutSec = null)
-            => ExecuteWithRetryAsync(c => c.ExecuteAsync(sql, param, commandTimeout: timeoutSec), "Execute");
-
-        public Task<IEnumerable<T>> QuerySpAsync<T>(string proc, object param = null, int? timeoutSec = null)
-            => ExecuteWithRetryAsync(c => c.QueryAsync<T>(proc, param, commandType: System.Data.CommandType.StoredProcedure, commandTimeout: timeoutSec), "Sp-Query");
-
-        public Task<T> QuerySpFirstAsync<T>(string proc, object param = null, int? timeoutSec = null)
-            => ExecuteWithRetryAsync(c => c.QueryFirstOrDefaultAsync<T>(proc, param, commandType: System.Data.CommandType.StoredProcedure, commandTimeout: timeoutSec), "Sp-First");
-
-        public Task<int> ExecuteSpAsync(string proc, object param = null, int? timeoutSec = null)
-            => ExecuteWithRetryAsync(c => c.ExecuteAsync(proc, param, commandType: System.Data.CommandType.StoredProcedure, commandTimeout: timeoutSec), "Sp-Execute");
-
-        public async Task TransactAsync(Func<DbConnection, DbTransaction, Task> action, [CallerMemberName] string op = "")
+        public async Task<bool> CheckHealthAsync()
         {
-            await ExecuteWithRetryAsync(async conn =>
+            try
             {
-                using var tx = conn.BeginTransaction(); // sync transaction creation
-                try
+                await ExecuteWithRetryAsync(async (c, ct) =>
                 {
-                    await action(conn, tx); // async Dapper operations with tx
-                    tx.Commit();
-                }
-                catch
-                {
-                    tx.Rollback();
-                    throw;
-                }
+                    await c.ExecuteAsync(HealthCheckSql);
+                    return true;
+                }, "MANUAL_HEALTH_CHECK");
                 return true;
-            }, op);
+            }
+            catch
+            {
+                return false;
+            }
         }
 
-        /// <summary>
-        /// Abstract method for full DB backup. Must be implemented per provider.
-        /// </summary>
+        // --------------------------------------------------------------------
+        // Dapper API - all methods use ExecuteWithRetryAsync
+        // --------------------------------------------------------------------
+        public Task<IEnumerable<T>> QueryAsync<T>(string sql, object param = null, int? timeoutSec = null)
+        {
+            return ExecuteWithRetryAsync(
+                (c, ct) => c.QueryAsync<T>(sql, param, commandTimeout: timeoutSec),
+                "QueryAsync",
+                result =>
+                {
+                    int count = result is ICollection<T> col ? col.Count : result.Count();
+                    return $"Loaded {count} rows";
+                });
+        }
+
+        public Task<T> QueryFirstOrDefaultAsync<T>(string sql, object param = null, int? timeoutSec = null)
+        {
+            return ExecuteWithRetryAsync(
+                (c, ct) => c.QueryFirstOrDefaultAsync<T>(sql, param, commandTimeout: timeoutSec),
+                "QueryFirstOrDefaultAsync",
+                result => result != null ? "Loaded 1 row" : "Loaded 0 rows");
+        }
+
+        public Task<int> ExecuteAsync(string sql, object param = null, int? timeoutSec = null)
+        {
+            return ExecuteWithRetryAsync(
+                (c, ct) => c.ExecuteAsync(sql, param, commandTimeout: timeoutSec),
+                "ExecuteAsync",
+                rowsAffected => $"Affected {rowsAffected} rows");
+        }
+
+        public Task<IEnumerable<T>> QuerySpAsync<T>(string proc, object param = null, int? timeoutSec = null)
+        {
+            return ExecuteWithRetryAsync(
+                (c, ct) => c.QueryAsync<T>(proc, param, commandType: System.Data.CommandType.StoredProcedure, commandTimeout: timeoutSec),
+                "QuerySpAsync",
+                result =>
+                {
+                    int count = result is ICollection<T> col ? col.Count : result.Count();
+                    return $"Loaded {count} rows";
+                });
+        }
+
+        public Task<T> QuerySpFirstAsync<T>(string proc, object param = null, int? timeoutSec = null)
+        {
+            return ExecuteWithRetryAsync(
+                (c, ct) => c.QueryFirstOrDefaultAsync<T>(proc, param, commandType: System.Data.CommandType.StoredProcedure, commandTimeout: timeoutSec),
+                "QuerySpFirstAsync",
+                result => result != null ? "Loaded 1 row" : "Loaded 0 rows");
+        }
+
+        public Task<int> ExecuteSpAsync(string proc, object param = null, int? timeoutSec = null)
+        {
+            return ExecuteWithRetryAsync(
+                (c, ct) => c.ExecuteAsync(proc, param, commandType: System.Data.CommandType.StoredProcedure, commandTimeout: timeoutSec),
+                "ExecuteSpAsync",
+                rowsAffected => $"Affected {rowsAffected} rows");
+        }
+
+        public Task TransactAsync(Func<DbConnection, DbTransaction, Task> action, [CallerMemberName] string operationName = "")
+        {
+            return ExecuteWithRetryAsync(
+                async (conn, ct) =>
+                {
+                    using var tx = conn.BeginTransaction();
+                    try
+                    {
+                        await action(conn, tx).ConfigureAwait(false);
+                        tx.Commit();
+                    }
+                    catch
+                    {
+                        tx.Rollback();
+                        throw;
+                    }
+                    return true; // no row count for transactions
+                },
+                operationName,
+                _ => "Transaction executed");
+        }
+
+
+        // --------------------------------------------------------------------
+        // Abstract backup method
+        // --------------------------------------------------------------------
         public abstract Task<bool> CreateFullBackupAsync(string filePath);
 
-        /// <summary>
-        /// Dispose of health monitor and cancellation token.
-        /// </summary>
+        // --------------------------------------------------------------------
+        // Dispose
+        // --------------------------------------------------------------------
         public void Dispose()
         {
             _cts.Cancel();
             try { _healthTask?.Wait(3000); } catch { }
             _cts.Dispose();
-            Logs.Write(Logger, "Stop", Name, "Disposed");
+            LogOperation("Dispose", 0, true);
         }
+
+        // --------------------------------------------------------------------
+        // Centralized logging (simple + structured)
+        // --------------------------------------------------------------------
+        private void LogOperation(string operation, long elapsedMs, bool success, string detail = null)
+        {
+            string ts = DateTime.Now.ToString("hh:mm:ss tt");
+            string status = success ? "Ok" : "Fail";
+            string msg = $"'Next-Provider' ({Name}: {operation}):";
+
+            if (!string.IsNullOrWhiteSpace(detail))
+                msg += $" {detail}";
+
+            msg += $" ({ts}) '{elapsedMs} ms' → {status}";
+
+            Logger?.Invoke(msg);
+
+            if (_structuredLogger == null) return;
+
+            if (success)
+                _structuredLogger.LogInformation("{Name} {Operation} {Detail} in {ElapsedMs} ms", Name, operation, detail, elapsedMs);
+            else
+                _structuredLogger.LogError("{Name} {Operation} failed after {ElapsedMs} ms: {Detail}", Name, operation, elapsedMs, detail);
+        }
+
     }
 }
-
-
-
