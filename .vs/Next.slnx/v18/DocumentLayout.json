@@ -3,7 +3,11 @@
   "WorkspaceRootPath": "C:\\Users\\rocky\\Documents\\GitHub\\Next\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{B4681C78-7743-475A-B544-1D5752B2173C}|Next.csproj|c:\\users\\rocky\\documents\\github\\next\\clients\\core\\cachehelper.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "AbsoluteMoniker": "D:0:0:{B4681C78-7743-475A-B544-1D5752B2173C}|Next.csproj|c:\\users\\rocky\\documents\\github\\next\\controls\\extention\\gridviews.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{B4681C78-7743-475A-B544-1D5752B2173C}|Next.csproj|solutionrelative:controls\\extention\\gridviews.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{B4681C78-7743-475A-B544-1D5752B2173C}|Next.csproj|C:\\Users\\rocky\\Documents\\GitHub\\Next\\clients\\core\\cachehelper.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{B4681C78-7743-475A-B544-1D5752B2173C}|Next.csproj|solutionrelative:clients\\core\\cachehelper.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     }
   ],
@@ -19,15 +23,27 @@
             {
               "$type": "Document",
               "DocumentIndex": 0,
+              "Title": "Gridviews.cs",
+              "DocumentMoniker": "C:\\Users\\rocky\\Documents\\GitHub\\Next\\Controls\\Extention\\Gridviews.cs",
+              "RelativeDocumentMoniker": "Controls\\Extention\\Gridviews.cs",
+              "ToolTip": "C:\\Users\\rocky\\Documents\\GitHub\\Next\\Controls\\Extention\\Gridviews.cs",
+              "RelativeToolTip": "Controls\\Extention\\Gridviews.cs",
+              "ViewState": "AgIAAHgCAAAAAAAAAAAwwAUDAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-01-12T08:25:55.649Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
               "Title": "CacheHelper.cs",
               "DocumentMoniker": "C:\\Users\\rocky\\Documents\\GitHub\\Next\\Clients\\Core\\CacheHelper.cs",
               "RelativeDocumentMoniker": "Clients\\Core\\CacheHelper.cs",
               "ToolTip": "C:\\Users\\rocky\\Documents\\GitHub\\Next\\Clients\\Core\\CacheHelper.cs",
               "RelativeToolTip": "Clients\\Core\\CacheHelper.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAsAAAASAAAAAAAAAA==",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAACMAAAAJAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-12-31T18:46:33.356Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-12-31T18:46:33.356Z"
             }
           ]
         }

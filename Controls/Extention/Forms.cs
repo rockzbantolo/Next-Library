@@ -152,21 +152,22 @@ namespace Next.Controls.Extention
                 return;
             }
 
-            using var overlay = new Form
+            using (Form shadow = new Form())
             {
-                FormBorderStyle = FormBorderStyle.None,
-                BackColor = Color.Black,
-                Opacity = 0.45,
-                ShowInTaskbar = false,
-                StartPosition = FormStartPosition.Manual,
-                Bounds = Screen.FromControl(owner).WorkingArea,
-                TopMost = true
-            };
+                shadow.FormBorderStyle = FormBorderStyle.None;
+                shadow.Opacity = 0.5;
+                shadow.BackColor = Color.Black;
+                shadow.ShowInTaskbar = false;
+                shadow.StartPosition = FormStartPosition.Manual;
 
-            overlay.Show(owner);
-            dialog.StartPosition = FormStartPosition.CenterParent;
-            dialog.ShowDialog(owner);
-            // overlay auto-disposes via using block
+                var screen      = Screen.FromControl(owner);
+                shadow.Size     = screen.WorkingArea.Size;
+                shadow.Location = screen.WorkingArea.Location;
+
+                shadow.Show();
+                dialog.Owner = shadow;
+                dialog.ShowDialog();
+            }
         }
 
         // ──────────────────────────────────────────────────────────────

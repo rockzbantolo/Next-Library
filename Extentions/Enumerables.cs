@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -10,103 +11,109 @@ namespace Next.Extention
 {
     public static class Enumerables
     {
-        /// <summary>
-        /// Converts an IEnumerable&lt;dynamic&gt; (Dapper result set) into a DataTable.
-        ///
-        /// COLUMN RULES
-        /// - Columns are inferred from the first row's keys
-        /// - All columns use typeof(object) for maximum compatibility
-        ///
-        /// SAFETY
-        /// - Returns an empty DataTable if rows is null or empty
-        /// - Null values are converted to DBNull.Value
-        ///
-        /// INTENDED USE
-        /// - WinForms DataGridView binding
-        /// - UI-facing service/controller layers
-        ///
-        /// NOT INTENDED FOR
-        /// - Core data-access libraries
-        /// - Business/domain logic
-        /// </summary>
-        /// <param name="rows">Dynamic query results (typically from Dapper)</param>
-        /// <param name="tableName">Optional DataTable name (default: "Result")</param>
-        public static DataTable ToDataTable(this IEnumerable<dynamic> rows,
-            string tableName = "Result")
+        // Cache PropertyInfo[] per type to avoid repeated reflection
+        private static readonly Dictionary<Type, PropertyInfo[]> _propertyCache = new();
+
+        // 1. For dynamic (Dapper ExpandoObject)
+        public static DataTable ToDataTable(this IEnumerable<dynamic> rows, string tableName = "Result")
         {
             var dt = new DataTable(tableName);
-
-            if (rows == null)
-                return dt;
+            if (rows == null) return dt;
 
             var list = rows as IList<dynamic> ?? rows.ToList();
-            if (list.Count == 0)
-                return dt;
+            if (list.Count == 0) return dt;
 
-            // Dapper returns ExpandoObject → IDictionary<string, object>
-            var firstRow = (IDictionary<string, object>)list[0];
+            var first = (IDictionary<string, object>)list[0];
+            var keys = first.Keys.ToArray();
 
-            // Build schema
-            foreach (var key in firstRow.Keys)
+            foreach (var k in keys) dt.Columns.Add(k, typeof(object));
+
+            dt.BeginLoadData();
+            var buffer = new object[keys.Length];
+
+            for (int i = 0; i < list.Count; i++)
             {
-                dt.Columns.Add(key, typeof(object));
+                var d = (IDictionary<string, object>)list[i];
+                for (int j = 0; j < keys.Length; j++)
+                    buffer[j] = d.TryGetValue(keys[j], out var v) ? (v ?? DBNull.Value) : DBNull.Value;
+                dt.Rows.Add(buffer);
             }
-
-            // Populate rows
-            foreach (var row in list)
-            {
-                var dr = dt.NewRow();
-                var dict = (IDictionary<string, object>)row;
-
-                foreach (var kvp in dict)
-                {
-                    dr[kvp.Key] = kvp.Value ?? DBNull.Value;
-                }
-
-                dt.Rows.Add(dr);
-            }
-
+            dt.EndLoadData();
             return dt;
         }
 
         /// <summary>
-        /// Converts an IEnumerable&lt;IDictionary&lt;string, object&gt;&gt; into a DataTable.
-        ///
-        /// This overload exists for explicit dictionary-based pipelines or
-        /// non-dynamic callers.
+        /// Converts a strongly-typed IEnumerable<T> to a DataTable efficiently.
         /// </summary>
-        /// <param name="rows">Dictionary-based row data</param>
-        /// <param name="tableName">Optional DataTable name (default: "Result")</param>
-        public static DataTable ToDataTable(this IEnumerable<IDictionary<string,
-            object>> rows,
-            string tableName = "Result")
+        public static DataTable ToDataTable<T>(this IEnumerable<T> data, string tableName = "Result")
         {
             var dt = new DataTable(tableName);
+            if (data == null) return dt;
 
-            if (rows == null)
-                return dt;
+            // Convert to list once to avoid multiple enumerations
+            var list = data as IList<T> ?? data.ToList();
+            if (list.Count == 0) return dt;
+
+            // Get cached PropertyInfo[] for type T
+            var type = typeof(T);
+            if (!_propertyCache.TryGetValue(type, out var props))
+            {
+                props = type.GetProperties(BindingFlags.Public | BindingFlags.Instance);
+                _propertyCache[type] = props;
+            }
+
+            // Add columns
+            foreach (var p in props)
+            {
+                var columnType = Nullable.GetUnderlyingType(p.PropertyType) ?? p.PropertyType;
+                dt.Columns.Add(p.Name, columnType);
+            }
+
+            dt.BeginLoadData();
+            var buffer = new object[props.Length];
+
+            // Fill rows
+            foreach (var item in list)
+            {
+                for (int j = 0; j < props.Length; j++)
+                {
+                    object value = props[j].GetValue(item);
+
+                    // Null-safe conversion
+                    buffer[j] = value ?? DBNull.Value;
+                }
+                dt.Rows.Add(buffer);
+            }
+
+            dt.EndLoadData();
+            return dt;
+        }
+
+        // 3. For IDictionary<string, object>
+        public static DataTable ToDataTable(this IEnumerable<IDictionary<string, object>> rows, string tableName = "Result")
+        {
+            var dt = new DataTable(tableName);
+            if (rows == null) return dt;
 
             var list = rows as IList<IDictionary<string, object>> ?? rows.ToList();
-            if (list.Count == 0)
-                return dt;
+            if (list.Count == 0) return dt;
 
-            var firstRow = list[0];
+            var first = list[0];
+            var keys = first.Keys.ToArray();
 
-            foreach (var key in firstRow.Keys)
+            foreach (var k in keys) dt.Columns.Add(k, typeof(object));
+
+            dt.BeginLoadData();
+            var buffer = new object[keys.Length];
+
+            for (int i = 0; i < list.Count; i++)
             {
-                dt.Columns.Add(key, typeof(object));
+                var d = list[i];
+                for (int j = 0; j < keys.Length; j++)
+                    buffer[j] = d.TryGetValue(keys[j], out var v) ? (v ?? DBNull.Value) : DBNull.Value;
+                dt.Rows.Add(buffer);
             }
-
-            foreach (var row in list)
-            {
-                var dr = dt.NewRow();
-                foreach (var kvp in row)
-                {
-                    dr[kvp.Key] = kvp.Value ?? DBNull.Value;
-                }
-                dt.Rows.Add(dr);
-            }
-
+            dt.EndLoadData();
             return dt;
         }
 

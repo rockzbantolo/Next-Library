@@ -9,6 +9,7 @@ using System.Drawing.Drawing2D;
 using System.Drawing.Text;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
@@ -35,10 +36,7 @@ namespace Next.Controls.Extention
             /// <param name="columnName">Column name as set in the designer (Name property)</param>
             /// <param name="defaultValue">Value returned if the cell is missing, null, DBNull or conversion fails</param>
             /// <returns>The converted value or defaultValue</returns>
-            public static T GetValue<T>(this DataGridView dgv,
-                                        int rowIndex,
-                                        string columnName,
-                                        T defaultValue = default)
+            public static T GetValue<T>(this DataGridView dgv, int rowIndex, string columnName, T defaultValue = default)
             {
                 if (dgv is null ||
                     rowIndex < 0 ||
@@ -658,82 +656,8 @@ namespace Next.Controls.Extention
         #region Bind Data
 
             // ────────────────────────────────────────────────────────────────────────────────
-            //  
+            // MAIN ENTRY POINT
             // ────────────────────────────────────────────────────────────────────────────────
-            private static void BindTable(DataGridView dgv, DataTable dt)
-            {
-                dgv.SuspendLayout();
-                dgv.Rows.Clear();
-
-                if (dt == null || dt.Rows.Count == 0)
-                {
-                    dgv.ClearSelection();
-                    dgv.ResumeLayout();
-                    return;
-                }
-
-                // AUTO-CREATE COLUMNS ONLY IF GRID HAS NONE
-                if (dgv.Columns.Count == 0)
-                {
-                    foreach (DataColumn col in dt.Columns)
-                        dgv.Columns.Add(col.ColumnName, col.ColumnName);
-                }
-
-                int colCount = Math.Min(dt.Columns.Count, dgv.Columns.Count);
-
-                foreach (DataRow row in dt.Rows)
-                {
-                    int idx = dgv.Rows.Add();
-                    for (int i = 0; i < colCount; i++)
-                        dgv.Rows[idx].Cells[i].Value = row[i];
-                }
-
-                dgv.ClearSelection();
-                dgv.ResumeLayout();
-            }
-
-            private static void BindDynamic(DataGridView dgv, IEnumerable<dynamic> rows)
-            {
-                dgv.SuspendLayout();
-                dgv.Rows.Clear();
-
-                var list = rows?.ToList();
-                if (list == null || list.Count == 0)
-                {
-                    dgv.ClearSelection();
-                    dgv.ResumeLayout();
-                    return;
-                }
-
-                // AUTO-CREATE COLUMNS ONLY IF GRID HAS NONE
-                if (dgv.Columns.Count == 0)
-                {
-                    var first = (IDictionary<string, object>)list[0];
-                    foreach (var key in first.Keys)
-                        dgv.Columns.Add(key, key);
-                }
-
-                foreach (var row in list)
-                {
-                    var values = ((IDictionary<string, object>)row).Values.ToArray();
-                    int idx = dgv.Rows.Add();
-
-                    for (int i = 0; i < dgv.Columns.Count && i < values.Length; i++)
-                        dgv.Rows[idx].Cells[i].Value = values[i];
-                }
-
-                dgv.ClearSelection();
-                dgv.AutoResizeColumns(DataGridViewAutoSizeColumnsMode.AllCells);
-                dgv.ResumeLayout();
-            }
-
-            // ────────────────────────────────────────────────────────────────────────────────
-            //  
-            // ────────────────────────────────────────────────────────────────────────────────
-            /// <summary>
-            /// Unified binding entry point.
-            /// Supports DataTable, IEnumerable<dynamic>, IEnumerable<IDictionary<string, object>>.
-            /// </summary>
             public static IResult BindData(this DataGridView dgv, object data)
             {
                 if (dgv == null || dgv.IsDisposed || dgv.Disposing)
@@ -766,6 +690,19 @@ namespace Next.Controls.Extention
                         return Results.Ok("Dictionary data bound.");
                     }
 
+                    // Support IEnumerable<T> models
+                    var type = data.GetType();
+                    if (type.IsGenericType && typeof(IEnumerable<>).IsAssignableFrom(type.GetGenericTypeDefinition()))
+                    {
+                        var modelType = type.GetGenericArguments()[0];
+                        var method = typeof(Gridviews)
+                            .GetMethod(nameof(BindModel), BindingFlags.NonPublic | BindingFlags.Static)
+                            ?.MakeGenericMethod(modelType);
+
+                        method?.Invoke(null, new object[] { dgv, data });
+                        return Results.Ok("Model bound.");
+                    }
+
                     return Results.Error("Unsupported data type.");
                 }
                 catch (Exception ex)
@@ -774,9 +711,115 @@ namespace Next.Controls.Extention
                 }
             }
 
-            // ────────────────────────────────────────────────────────────────────────────────
-            //  
-            // ────────────────────────────────────────────────────────────────────────────────
+            private static void BindTable(DataGridView dgv, DataTable dt)
+                {
+                    dgv.SuspendLayout();
+                    dgv.Rows.Clear();
+                    if (dt == null || dt.Rows.Count == 0)
+                    {
+                        dgv.ClearSelection();
+                        dgv.ResumeLayout();
+                        return;
+                    }
+
+                    if (dgv.Columns.Count == 0)
+                    {
+                        foreach (DataColumn col in dt.Columns)
+                            dgv.Columns.Add(col.ColumnName, col.ColumnName);
+                    }
+
+                    int colCount = Math.Min(dt.Columns.Count, dgv.Columns.Count);
+                    foreach (DataRow row in dt.Rows)
+                    {
+                        int idx = dgv.Rows.Add();
+                        for (int i = 0; i < colCount; i++)
+                            dgv.Rows[idx].Cells[i].Value = row[i];
+                    }
+
+                    dgv.ClearSelection();
+                    dgv.ResumeLayout();
+                }
+
+            private static void BindDynamic(DataGridView dgv, IEnumerable<dynamic> rows)
+            {
+                dgv.SuspendLayout();
+                dgv.Rows.Clear();
+                var list = rows?.ToList();
+                if (list == null || list.Count == 0)
+                {
+                    dgv.ClearSelection();
+                    dgv.ResumeLayout();
+                    return;
+                }
+
+                if (dgv.Columns.Count == 0)
+                {
+                    var first = (IDictionary<string, object>)list[0];
+                    foreach (var key in first.Keys)
+                        dgv.Columns.Add(key, key);
+                }
+
+                foreach (var row in list)
+                {
+                    var values = ((IDictionary<string, object>)row).Values.ToArray();
+                    int idx = dgv.Rows.Add();
+                    for (int i = 0; i < dgv.Columns.Count && i < values.Length; i++)
+                        dgv.Rows[idx].Cells[i].Value = values[i];
+                }
+
+                dgv.ClearSelection();
+                dgv.AutoResizeColumns(DataGridViewAutoSizeColumnsMode.AllCells);
+                dgv.ResumeLayout();
+            }
+
+            private static void BindModel<T>(DataGridView dgv, IEnumerable<T> rows)
+            {
+                var list = rows?.ToList();
+                dgv.SuspendLayout();
+                dgv.Rows.Clear();
+
+                if (list == null || list.Count == 0)
+                {
+                    dgv.ClearSelection();
+                    dgv.ResumeLayout();
+                    return;
+                }
+
+                var props = typeof(T).GetProperties(BindingFlags.Public | BindingFlags.Instance);
+
+                // Create columns if non exist
+                if (dgv.Columns.Count == 0)
+                {
+                    dgv.AutoGenerateColumns = false;
+
+                    foreach (var p in props)
+                    {
+                        dgv.Columns.Add(new DataGridViewTextBoxColumn
+                        {
+                            Name = p.Name,
+                            HeaderText = p.Name,
+                            DataPropertyName = p.Name,
+                            AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells
+                        });
+                    }
+                }
+
+                // Fill rows matching columns by Name
+                foreach (var item in list)
+                {
+                    int rowIndex = dgv.Rows.Add();
+                    foreach (DataGridViewColumn col in dgv.Columns)
+                    {
+                        var prop = props.FirstOrDefault(p => p.Name == col.Name);
+                        if (prop != null)
+                            dgv.Rows[rowIndex].Cells[col.Index].Value = prop.GetValue(item);
+                    }
+                }
+
+                dgv.ClearSelection();
+                dgv.ResumeLayout();
+            }
+
             /// <summary>
             /// Extension method for DataGridView that shows a loading overlay, awaits data asynchronously,
             /// applies minimum display time, binds the data, and shows either an empty message or hides the overlay.
@@ -793,64 +836,63 @@ namespace Next.Controls.Extention
             /// <param name="skeletonRows">Number of skeleton rows when using Skeleton mode (default: 8)</param>
             /// <returns>IResult from the BindData operation</returns>
             public static async Task<IResult> BindDataWithLoaderAsync<T>(
-                this DataGridView dgv,
-                Task<T> dataTask,
-                string loadingMessage = "Loading ...",
-                string emptyMessage = "No Data Found.",
-                Color? spinnerColor = null,
-                int spinnerRadius = 10,
-                int minSpinnerMilliseconds = 1000,
-                GridLoaderType loaderType = GridLoaderType.Spinner,
-                int skeletonRows = 8,
-                // NEW parameters — only used when loaderType == Skeleton
-                Color? skeletonBaseColor = null,
-                Color? skeletonHighlightColor = null)
-            {
-                if (dgv == null || dgv.IsDisposed || dgv.Disposing)
-                    return Results.Error("DataGridView is null or disposed.");
-
-                // Show initial loader with all customization options
-                dgv.SetLoading(
-                    isLoading: true,
-                    message: loadingMessage,
-                    loaderType: loaderType,
-                    customColor: spinnerColor,
-                    spinnerRadius: spinnerRadius,
-                    skeletonRowCount: skeletonRows,
-                    skeletonBaseColor: skeletonBaseColor,
-                    skeletonHighlightColor: skeletonHighlightColor);
-
-                dgv.Rows.Clear();
-
-                try
+                    this DataGridView dgv,
+                    Task<T> dataTask,
+                    string loadingMessage = "Loading ...",
+                    string emptyMessage = "No Data Found.",
+                    Color? spinnerColor = null,
+                    int spinnerRadius = 10,
+                    int minSpinnerMilliseconds = 500,
+                    GridLoaderType loaderType = GridLoaderType.Spinner,
+                    int skeletonRows = 8,
+                    Color? skeletonBaseColor = null,
+                    Color? skeletonHighlightColor = null)
                 {
-                    var minimumDelayTask = Task.Delay(minSpinnerMilliseconds);
-                    var data = await dataTask;
-                    await minimumDelayTask;
-                    var result = dgv.BindData(data);
+                    if (dgv == null || dgv.IsDisposed || dgv.Disposing)
+                        return Results.Error("DataGridView is null or disposed.");
 
-                    if (dgv.Rows.Count == 0)
-                    {
-                        dgv.SetLoading(
-                            isLoading: true,
-                            message: emptyMessage,
-                            loaderType: GridLoaderType.MessageOnly,
-                            customColor: spinnerColor,
-                            spinnerRadius: 0);
-                    }
-                    else
-                    {
-                        dgv.SetLoading(false);
-                    }
+                    // Show initial loader with all customization options
+                    dgv.SetLoading(
+                        isLoading: true,
+                        message: loadingMessage,
+                        loaderType: loaderType,
+                        customColor: spinnerColor,
+                        spinnerRadius: spinnerRadius,
+                        skeletonRowCount: skeletonRows,
+                        skeletonBaseColor: skeletonBaseColor,
+                        skeletonHighlightColor: skeletonHighlightColor);
 
-                    return result;
+                    dgv.Rows.Clear();
+
+                    try
+                    {
+                        var minimumDelayTask = Task.Delay(minSpinnerMilliseconds);
+                        var data = await dataTask;
+                        await minimumDelayTask;
+                        var result = dgv.BindData(data);
+
+                        if (dgv.Rows.Count == 0)
+                        {
+                            dgv.SetLoading(
+                                isLoading: true,
+                                message: emptyMessage,
+                                loaderType: GridLoaderType.MessageOnly,
+                                customColor: spinnerColor,
+                                spinnerRadius: 0);
+                        }
+                        else
+                        {
+                            dgv.SetLoading(false);
+                        }
+
+                        return result;
+                    }
+                    finally
+                    {
+                        if (dgv is not null && !dgv.IsDisposed && !dgv.Disposing && dgv.Rows.Count > 0)
+                            dgv.SetLoading(false);
+                    }
                 }
-                finally
-                {
-                    if (dgv is not null && !dgv.IsDisposed && !dgv.Disposing && dgv.Rows.Count > 0)
-                        dgv.SetLoading(false);
-                }
-            }
 
             // ────────────────────────────────────────────────────────────────────────────────
             // Load All Gridview at Once
@@ -922,6 +964,7 @@ namespace Next.Controls.Extention
                 public float[] SkeletonOffsets { get; set; }
                 public Color SkeletonBaseColor { get; set; }
                 public Color SkeletonHighlightColor { get; set; }
+                public float[] SkeletonWidths { get; set; }
             }
 
             /// <summary>
@@ -1131,47 +1174,56 @@ namespace Next.Controls.Extention
                 int headerHeight = dgv.ColumnHeadersHeight;
                 int rowHeight = dgv.RowTemplate.Height;
                 int cellHeight = rowHeight - SkeletonCellPadding * 2;
-                int totalWidth = dgv.ClientSize.Width - 20;
+                int maxBarWidth = dgv.ClientSize.Width - 40;  // some padding
+
+                // NEW: generate random widths once per row (if not already set)
+                if (state.SkeletonWidths == null || state.SkeletonWidths.Length != state.SkeletonRowCount)
+                {
+                    state.SkeletonWidths = new float[state.SkeletonRowCount];
+                    var rand = new Random();  // or use a static seeded one if you prefer reproducibility
+                    for (int i = 0; i < state.SkeletonRowCount; i++)
+                    {
+                        // 60%–98% of max width → looks natural
+                        state.SkeletonWidths[i] = (float)(maxBarWidth * (0.60 + rand.NextDouble() * 0.38));
+                    }
+                }
 
                 using var gradient = new LinearGradientBrush(
-                    new Rectangle(0, 0, totalWidth, cellHeight),
-                    Color.FromArgb((int)(255 * SkeletonOpacity), state.SkeletonBaseColor),          // ← use state
-                    Color.FromArgb((int)(255 * SkeletonOpacity), state.SkeletonHighlightColor),     // ← use state
+                    new Rectangle(0, 0, maxBarWidth, cellHeight),
+                    Color.FromArgb((int)(255 * SkeletonOpacity), state.SkeletonBaseColor),
+                    Color.FromArgb((int)(255 * SkeletonOpacity), state.SkeletonHighlightColor),
                     0f);
 
                 gradient.Blend = new Blend { Positions = [0f, 0.4f, 0.5f, 0.6f, 1f], Factors = [0f, 0f, 1f, 0f, 0f] };
 
                 int y = headerHeight + SkeletonCellPadding;
-
                 for (int i = 0; i < state.SkeletonRowCount && y + cellHeight < dgv.ClientSize.Height; i++)
                 {
-                    var rect = new Rectangle(10, y, totalWidth, cellHeight);
+                    var rect = new Rectangle(10, y, (int)state.SkeletonWidths[i], cellHeight);
                     using var brush = (LinearGradientBrush)gradient.Clone();
                     brush.TranslateTransform(state.SkeletonOffsets[i], 0);
-
                     using var path = GetRoundedRectangle(rect, SkeletonCornerRadius);
                     g.FillPath(brush, path);
-
                     y += rowHeight;
                 }
             }
 
             private static GraphicsPath GetRoundedRectangle(Rectangle bounds, int radius)
-            {
-                var path = new GraphicsPath();
-                int diameter = radius * 2;
-                var arc = new Rectangle(bounds.Location, new Size(diameter, diameter));
+                {
+                    var path = new GraphicsPath();
+                    int diameter = radius * 2;
+                    var arc = new Rectangle(bounds.Location, new Size(diameter, diameter));
 
-                path.AddArc(arc, 180, 90);
-                arc.X = bounds.Right - diameter;
-                path.AddArc(arc, 270, 90);
-                arc.Y = bounds.Bottom - diameter;
-                path.AddArc(arc, 0, 90);
-                arc.X = bounds.Left;
-                path.AddArc(arc, 90, 90);
-                path.CloseFigure();
-                return path;
-            }
+                    path.AddArc(arc, 180, 90);
+                    arc.X = bounds.Right - diameter;
+                    path.AddArc(arc, 270, 90);
+                    arc.Y = bounds.Bottom - diameter;
+                    path.AddArc(arc, 0, 90);
+                    arc.X = bounds.Left;
+                    path.AddArc(arc, 90, 90);
+                    path.CloseFigure();
+                    return path;
+                }
 
         #endregion
 

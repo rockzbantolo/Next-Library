@@ -353,7 +353,7 @@ namespace Next.Controls.Extention
                 Task<DataTable> dataTask,
                 string keyColumn,
                 IDictionary<string, List<LabelBinding>> rowMap,
-                int revealDelayMs = 1000,
+                int revealDelayMs = 500,
                 NullDisplayMode defaultNullDisplay = NullDisplayMode.Empty,
                 Action<IDictionary<string, long>> onTotals = null)
             {

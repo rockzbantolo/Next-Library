@@ -315,6 +315,14 @@ namespace Next.Clients.Core
                 rowsAffected => $"Affected {rowsAffected} rows");
         }
 
+        public Task<T> ExecuteScalarAsync<T>(string sql, object param = null, int? timeoutSec = null)
+        {
+            return ExecuteWithRetryAsync(
+                (c, ct) => c.ExecuteScalarAsync<T>(sql, param, commandTimeout: timeoutSec),
+                "ExecuteScalarAsync",
+                 result => result != null ? $"Returned {result}" : "Returned null");
+        }
+
         public Task<IEnumerable<T>> QuerySpAsync<T>(string proc, object param = null, int? timeoutSec = null)
         {
             return ExecuteWithRetryAsync(
