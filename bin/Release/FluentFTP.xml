@@ -999,7 +999,7 @@
             </remarks>
             <returns>
             Returns a listing of all the remote files, indicating if they were downloaded, skipped or overwritten.
-            Returns a blank list if nothing was transfered. Never returns null.
+            Returns a blank list if nothing was transferred. Never returns null.
             </returns>
         </member>
         <member name="M:FluentFTP.FtpClient.DownloadDirectoryAsync(System.String,System.String,FluentFTP.FtpFolderSyncMode,FluentFTP.FtpLocalExists,FluentFTP.FtpVerify,System.Collections.Generic.List{FluentFTP.Rules.FtpRule},System.IProgress{FluentFTP.FtpProgress},System.Threading.CancellationToken)">
@@ -1027,7 +1027,7 @@
             </remarks>
             <returns>
             Returns a listing of all the remote files, indicating if they were downloaded, skipped or overwritten.
-            Returns a blank list if nothing was transfered. Never returns null.
+            Returns a blank list if nothing was transferred. Never returns null.
             </returns>
         </member>
         <member name="M:FluentFTP.FtpClient.GetFilesToDownload(System.String,System.String,System.Collections.Generic.List{FluentFTP.Rules.FtpRule},System.Collections.Generic.List{FluentFTP.FtpResult},FluentFTP.FtpListItem[],System.Collections.Generic.Dictionary{System.String,System.Boolean})">
@@ -1250,7 +1250,7 @@
             </remarks>
             <returns>
             Returns a listing of all the remote files, indicating if they were downloaded, skipped or overwritten.
-            Returns a blank list if nothing was transfered. Never returns null.
+            Returns a blank list if nothing was transferred. Never returns null.
             </returns>
         </member>
         <member name="M:FluentFTP.FtpClient.UploadDirectoryAsync(System.String,System.String,FluentFTP.FtpFolderSyncMode,FluentFTP.FtpRemoteExists,FluentFTP.FtpVerify,System.Collections.Generic.List{FluentFTP.Rules.FtpRule},System.IProgress{FluentFTP.FtpProgress},System.Threading.CancellationToken)">
@@ -1278,7 +1278,7 @@
             </remarks>
             <returns>
             Returns a listing of all the remote files, indicating if they were downloaded, skipped or overwritten.
-            Returns a blank list if nothing was transfered. Never returns null.
+            Returns a blank list if nothing was transferred. Never returns null.
             </returns>
         </member>
         <member name="M:FluentFTP.FtpClient.GetSubDirectoriesToUpload(System.String,System.String,System.Collections.Generic.List{FluentFTP.Rules.FtpRule},System.Collections.Generic.List{FluentFTP.FtpResult},System.String[])">
@@ -1362,7 +1362,7 @@
             <param name="existsMode">If the file exists on disk, should we skip it, resume the download or restart the download?</param>
             <param name="verifyOptions">Sets if checksum verification is required for a successful download and what to do if it fails verification (See Remarks)</param>
             <param name="progress">Provide a callback to track download progress.</param>
-            Returns a FtpStatus indicating if the file was transfered.
+            Returns a FtpStatus indicating if the file was transferred.
             <remarks>
             If verification is enabled (All options other than <see cref="F:FluentFTP.FtpVerify.None"/>) the hash will be checked against the server.  If the server does not support
             any hash algorithm, then verification is ignored.  If only <see cref="F:FluentFTP.FtpVerify.OnlyChecksum"/> is set then the return of this method depends on both a successful 
@@ -1382,7 +1382,7 @@
             <param name="verifyOptions">Sets if checksum verification is required for a successful download and what to do if it fails verification (See Remarks)</param>
             <param name="progress">Provide a callback to track download progress.</param>
             <param name="token">The token that can be used to cancel the entire process</param>
-            Returns a FtpStatus indicating if the file was transfered.
+            Returns a FtpStatus indicating if the file was transferred.
             <remarks>
             If verification is enabled (All options other than <see cref="F:FluentFTP.FtpVerify.None"/>) the hash will be checked against the server.  If the server does not support
             any hash algorithm, then verification is ignored.  If only <see cref="F:FluentFTP.FtpVerify.OnlyChecksum"/> is set then the return of this method depends on both a successful 
@@ -1425,7 +1425,7 @@
             </remarks>
             <returns>
             Returns a listing of all the remote files, indicating if they were downloaded, skipped or overwritten.
-            Returns a blank list if nothing was transfered. Never returns null.
+            Returns a blank list if nothing was transferred. Never returns null.
             </returns>
         </member>
         <member name="M:FluentFTP.FtpClient.TransferDirectoryAsync(System.String,FluentFTP.FtpClient,System.String,FluentFTP.FtpFolderSyncMode,FluentFTP.FtpRemoteExists,FluentFTP.FtpVerify,System.Collections.Generic.List{FluentFTP.Rules.FtpRule},System.IProgress{FluentFTP.FtpProgress},System.Threading.CancellationToken)">
@@ -1455,7 +1455,7 @@
             </remarks>
             <returns>
             Returns a listing of all the remote files, indicating if they were downloaded, skipped or overwritten.
-            Returns a blank list if nothing was transfered. Never returns null.
+            Returns a blank list if nothing was transferred. Never returns null.
             </returns>
         </member>
         <member name="M:FluentFTP.FtpClient.GetChecksum(System.String,FluentFTP.FtpHashAlgorithm)">
@@ -2012,11 +2012,16 @@
             connection here.
             </summary>
         </member>
-        <member name="P:FluentFTP.FtpClient.UngracefullDisconnection">
+        <member name="P:FluentFTP.FtpClient.DisconnectWithQuit">
             <summary>
             Disconnect from the server without sending QUIT. This helps
             work around IOExceptions caused by buggy connection resets
             when closing the control connection.
+            </summary>
+        </member>
+        <member name="P:FluentFTP.FtpClient.DisconnectWithShutdown">
+            <summary>
+            Before we disconnect from the server, send the Shutdown signal on the socket stream.
             </summary>
         </member>
         <member name="P:FluentFTP.FtpClient.ConnectTimeout">
@@ -2094,7 +2099,7 @@
         <member name="P:FluentFTP.FtpClient.SslBuffering">
             <summary>
             Whether to use SSL Buffering to speed up data transfer during FTP operations.
-            SSL Buffering is always disabled on .NET 5.0 due to platform issues (see issue 682 in FluentFTP issue tracker).
+            SSL Buffering is always disabled on .NET 5.0 and later due to platform issues (see issue 682 in FluentFTP issue tracker).
             </summary>
         </member>
         <member name="P:FluentFTP.FtpClient.IsEncrypted">
@@ -2566,7 +2571,7 @@
         </member>
         <member name="M:FluentFTP.FtpClient.OpenWrite(System.String,FluentFTP.FtpDataType,System.Boolean)">
             <summary>
-            Opens the specified file for writing. Please call GetReply() after you have successfully transfered the file to read the "OK" command sent by the server and prevent stale data on the socket.
+            Opens the specified file for writing. Please call GetReply() after you have successfully transferred the file to read the "OK" command sent by the server and prevent stale data on the socket.
             </summary>
             <param name="path">Full or relative path of the file</param>
             <param name="type">ASCII/Binary</param>
@@ -2575,7 +2580,7 @@
         </member>
         <member name="M:FluentFTP.FtpClient.OpenWrite(System.String,FluentFTP.FtpDataType,System.Int64)">
             <summary>
-            Opens the specified file for writing. Please call GetReply() after you have successfully transfered the file to read the "OK" command sent by the server and prevent stale data on the socket.
+            Opens the specified file for writing. Please call GetReply() after you have successfully transferred the file to read the "OK" command sent by the server and prevent stale data on the socket.
             </summary>
             <param name="path">Full or relative path of the file</param>
             <param name="type">ASCII/Binary</param>
@@ -2589,7 +2594,7 @@
         </member>
         <member name="M:FluentFTP.FtpClient.OpenWriteAsync(System.String,FluentFTP.FtpDataType,System.Boolean,System.Threading.CancellationToken)">
             <summary>
-            Opens the specified file for writing. Please call GetReply() after you have successfully transfered the file to read the "OK" command sent by the server and prevent stale data on the socket.
+            Opens the specified file for writing. Please call GetReply() after you have successfully transferred the file to read the "OK" command sent by the server and prevent stale data on the socket.
             </summary>
             <param name="path">Full or relative path of the file</param>
             <param name="type">ASCII/Binary</param>
@@ -2599,7 +2604,7 @@
         </member>
         <member name="M:FluentFTP.FtpClient.OpenWriteAsync(System.String,FluentFTP.FtpDataType,System.Int64,System.Threading.CancellationToken)">
             <summary>
-            Opens the specified file for writing. Please call GetReply() after you have successfully transfered the file to read the "OK" command sent by the server and prevent stale data on the socket.
+            Opens the specified file for writing. Please call GetReply() after you have successfully transferred the file to read the "OK" command sent by the server and prevent stale data on the socket.
             </summary>
             <param name="path">Full or relative path of the file</param>
             <param name="type">ASCII/Binary</param>
@@ -2614,7 +2619,7 @@
         </member>
         <member name="M:FluentFTP.FtpClient.OpenAppend(System.String,FluentFTP.FtpDataType,System.Boolean)">
             <summary>
-            Opens the specified file for appending. Please call GetReply() after you have successfully transfered the file to read the "OK" command sent by the server and prevent stale data on the socket.
+            Opens the specified file for appending. Please call GetReply() after you have successfully transferred the file to read the "OK" command sent by the server and prevent stale data on the socket.
             </summary>
             <param name="path">The full or relative path to the file to be opened</param>
             <param name="type">ASCII/Binary</param>
@@ -2623,7 +2628,7 @@
         </member>
         <member name="M:FluentFTP.FtpClient.OpenAppend(System.String,FluentFTP.FtpDataType,System.Int64)">
             <summary>
-            Opens the specified file for appending. Please call GetReply() after you have successfully transfered the file to read the "OK" command sent by the server and prevent stale data on the socket.
+            Opens the specified file for appending. Please call GetReply() after you have successfully transferred the file to read the "OK" command sent by the server and prevent stale data on the socket.
             </summary>
             <param name="path">The full or relative path to the file to be opened</param>
             <param name="type">ASCII/Binary</param>
@@ -3845,6 +3850,16 @@
             Definitely Titan FTP server
             </summary>
         </member>
+        <member name="F:FluentFTP.FtpServer.Rumpus">
+            <summary>
+            Definitely Rumpus server
+            </summary>
+        </member>
+        <member name="F:FluentFTP.FtpServer.ABBIDAL">
+            <summary>
+            Definitely ABB IDAL server
+            </summary>
+        </member>
         <member name="T:FluentFTP.FtpSpecialPermissions">
             <summary>
             Types of special UNIX permissions
@@ -4747,7 +4762,7 @@
             <param name="record">A line from the listing</param>
             <returns>FtpListItem if the item is able to be parsed</returns>
         </member>
-        <member name="M:FluentFTP.Helpers.Parsers.FtpWindowsParser.ParseName(FluentFTP.FtpClient,System.String,System.String[])">
+        <member name="M:FluentFTP.Helpers.Parsers.FtpWindowsParser.ParseName(FluentFTP.FtpClient,System.String,System.String[],System.Boolean)">
             <summary>
             Parses the file or folder name from IIS/DOS format listings
             </summary>
@@ -5254,12 +5269,12 @@
         </member>
         <member name="P:FluentFTP.FtpProgress.RemotePath">
             <summary>
-            Stores the absolute remote path of the current file being transfered.
+            Stores the absolute remote path of the current file being transferred.
             </summary>
         </member>
         <member name="P:FluentFTP.FtpProgress.LocalPath">
             <summary>
-            Stores the absolute local path of the current file being transfered.
+            Stores the absolute local path of the current file being transferred.
             </summary>
         </member>
         <member name="P:FluentFTP.FtpProgress.FileIndex">
@@ -5270,7 +5285,7 @@
         </member>
         <member name="P:FluentFTP.FtpProgress.FileCount">
             <summary>
-            Stores the total count of the files to be transfered.
+            Stores the total count of the files to be transferred.
             Only used when transferring multiple files or an entire directory.
             </summary>
         </member>
@@ -5362,12 +5377,12 @@
         </member>
         <member name="P:FluentFTP.FtpResult.RemotePath">
             <summary>
-            Stores the absolute remote path of the current file being transfered.
+            Stores the absolute remote path of the current file being transferred.
             </summary>
         </member>
         <member name="P:FluentFTP.FtpResult.LocalPath">
             <summary>
-            Stores the absolute local path of the current file being transfered.
+            Stores the absolute local path of the current file being transferred.
             </summary>
         </member>
         <member name="F:FluentFTP.FtpResult.Exception">
@@ -5487,6 +5502,32 @@
             <param name="stream">The socket stream.</param>
             <param name="token">Cancellation token.</param>
         </member>
+        <member name="T:FluentFTP.Proxy.FtpClientSocks4aProxy">
+            <summary> A FTP client with a SOCKS4a proxy implementation. </summary>
+        </member>
+        <member name="M:FluentFTP.Proxy.FtpClientSocks4aProxy.Handshake">
+            <summary>
+            Called during Connect(). Typically extended by FTP proxies.
+            </summary>
+        </member>
+        <member name="M:FluentFTP.Proxy.FtpClientSocks4aProxy.HandshakeAsync(System.Threading.CancellationToken)">
+            <summary>
+            Called during <see cref="!:ConnectAsync()"/>. Typically extended by FTP proxies.
+            </summary>
+        </member>
+        <member name="T:FluentFTP.Proxy.FtpClientSocks4Proxy">
+            <summary> A FTP client with a SOCKS4 proxy implementation. </summary>
+        </member>
+        <member name="M:FluentFTP.Proxy.FtpClientSocks4Proxy.Handshake">
+            <summary>
+            Called during Connect(). Typically extended by FTP proxies.
+            </summary>
+        </member>
+        <member name="M:FluentFTP.Proxy.FtpClientSocks4Proxy.HandshakeAsync(System.Threading.CancellationToken)">
+            <summary>
+            Called during <see cref="!:ConnectAsync()"/>. Typically extended by FTP proxies.
+            </summary>
+        </member>
         <member name="T:FluentFTP.Proxy.FtpClientSocks5Proxy">
             <summary> A FTP client with a SOCKS5 proxy implementation. </summary>
         </member>
@@ -5516,6 +5557,32 @@
         </member>
         <member name="P:FluentFTP.Proxy.ProxyInfo.Credentials">
             <summary> Proxy login credentials </summary>
+        </member>
+        <member name="T:FluentFTP.Proxy.Socks.Socks4aProxy">
+            <summary>
+                This class is not reusable.
+                You have to create a new instance for each connection / attempt.
+            </summary>
+        </member>
+        <member name="T:FluentFTP.Proxy.Socks.Socks4Proxy">
+            <summary>
+                This class is not reusable.
+                You have to create a new instance for each connection / attempt.
+            </summary>
+        </member>
+        <member name="M:FluentFTP.Proxy.Socks.Socks4Proxy.GetIPAddressBytes(System.String)">
+            <summary>
+            Translate the host name or IP address to a byte array.
+            </summary>
+            <param name="destinationHost">Host name or IP address.</param>
+            <returns>Byte array representing IP address in bytes.</returns>
+        </member>
+        <member name="M:FluentFTP.Proxy.Socks.Socks4Proxy.GetDestinationPortBytes(System.Int32)">
+            <summary>
+            Translate the destination port value to a byte array.
+            </summary>
+            <param name="value">Destination port.</param>
+            <returns>Byte array representing an 16 bit port number as two bytes.</returns>
         </member>
         <member name="T:FluentFTP.Proxy.Socks.SocksProxy">
             <summary>
@@ -5903,6 +5970,21 @@
             MUST BE LOWER CASE!
             </summary>
         </member>
+        <member name="T:FluentFTP.Servers.Handlers.ABBIDALFtpServer">
+            <summary>
+            Server-specific handling for ABB IDAL FTP servers
+            </summary>
+        </member>
+        <member name="M:FluentFTP.Servers.Handlers.ABBIDALFtpServer.ToEnum">
+            <summary>
+            Return the FtpServer enum value corresponding to your server, or Unknown if its a custom implementation.
+            </summary>
+        </member>
+        <member name="M:FluentFTP.Servers.Handlers.ABBIDALFtpServer.DetectByWelcome(System.String)">
+            <summary>
+            Return true if your server is detected by the given FTP server welcome message.
+            </summary>
+        </member>
         <member name="T:FluentFTP.Servers.Handlers.BFtpdServer">
             <summary>
             Server-specific handling for BFTPd FTP servers
@@ -6256,6 +6338,21 @@
             </summary>
         </member>
         <member name="M:FluentFTP.Servers.Handlers.PyFtpdLibServer.DetectByWelcome(System.String)">
+            <summary>
+            Return true if your server is detected by the given FTP server welcome message.
+            </summary>
+        </member>
+        <member name="T:FluentFTP.Servers.Handlers.RumpusServer">
+            <summary>
+            Server-specific handling for Rumpus FTP servers
+            </summary>
+        </member>
+        <member name="M:FluentFTP.Servers.Handlers.RumpusServer.ToEnum">
+            <summary>
+            Return the FtpServer enum value corresponding to your server, or Unknown if its a custom implementation.
+            </summary>
+        </member>
+        <member name="M:FluentFTP.Servers.Handlers.RumpusServer.DetectByWelcome(System.String)">
             <summary>
             Return true if your server is detected by the given FTP server welcome message.
             </summary>

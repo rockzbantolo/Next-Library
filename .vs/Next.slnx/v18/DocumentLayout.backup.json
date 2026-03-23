@@ -3,12 +3,20 @@
   "WorkspaceRootPath": "C:\\Users\\rocky\\Documents\\GitHub\\Next\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{B4681C78-7743-475A-B544-1D5752B2173C}|Next.csproj|c:\\users\\rocky\\documents\\github\\next\\controls\\extention\\gridviews.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{B4681C78-7743-475A-B544-1D5752B2173C}|Next.csproj|solutionrelative:controls\\extention\\gridviews.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+      "AbsoluteMoniker": "D:0:0:{B4681C78-7743-475A-B544-1D5752B2173C}|Next.csproj|c:\\users\\rocky\\documents\\github\\next\\clients\\providers\\mysqldb.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{B4681C78-7743-475A-B544-1D5752B2173C}|Next.csproj|solutionrelative:clients\\providers\\mysqldb.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{B4681C78-7743-475A-B544-1D5752B2173C}|Next.csproj|C:\\Users\\rocky\\Documents\\GitHub\\Next\\clients\\core\\cachehelper.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{B4681C78-7743-475A-B544-1D5752B2173C}|Next.csproj|solutionrelative:clients\\core\\cachehelper.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+      "AbsoluteMoniker": "D:0:0:{B4681C78-7743-475A-B544-1D5752B2173C}|Next.csproj|c:\\users\\rocky\\documents\\github\\next\\clients\\core\\base.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{B4681C78-7743-475A-B544-1D5752B2173C}|Next.csproj|solutionrelative:clients\\core\\base.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{B4681C78-7743-475A-B544-1D5752B2173C}|Next.csproj|C:\\Users\\rocky\\Documents\\GitHub\\Next\\clients\\idatabase.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{B4681C78-7743-475A-B544-1D5752B2173C}|Next.csproj|solutionrelative:clients\\idatabase.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{B4681C78-7743-475A-B544-1D5752B2173C}|Next.csproj|C:\\Users\\rocky\\Documents\\GitHub\\Next\\services\\ftp.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{B4681C78-7743-475A-B544-1D5752B2173C}|Next.csproj|solutionrelative:services\\ftp.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     }
   ],
   "DocumentGroupContainers": [
@@ -23,27 +31,52 @@
             {
               "$type": "Document",
               "DocumentIndex": 0,
-              "Title": "Gridviews.cs",
-              "DocumentMoniker": "C:\\Users\\rocky\\Documents\\GitHub\\Next\\Controls\\Extention\\Gridviews.cs",
-              "RelativeDocumentMoniker": "Controls\\Extention\\Gridviews.cs",
-              "ToolTip": "C:\\Users\\rocky\\Documents\\GitHub\\Next\\Controls\\Extention\\Gridviews.cs",
-              "RelativeToolTip": "Controls\\Extention\\Gridviews.cs",
-              "ViewState": "AgIAAGQCAAAAAAAAAAAowDUDAAAAAAAAAAAAAA==",
+              "Title": "MySqlDb.cs",
+              "DocumentMoniker": "C:\\Users\\rocky\\Documents\\GitHub\\Next\\Clients\\Providers\\MySqlDb.cs",
+              "RelativeDocumentMoniker": "Clients\\Providers\\MySqlDb.cs",
+              "ToolTip": "C:\\Users\\rocky\\Documents\\GitHub\\Next\\Clients\\Providers\\MySqlDb.cs",
+              "RelativeToolTip": "Clients\\Providers\\MySqlDb.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAABcAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-01-12T08:25:55.649Z",
+              "WhenOpened": "2026-02-27T10:01:56.295Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 1,
-              "Title": "CacheHelper.cs",
-              "DocumentMoniker": "C:\\Users\\rocky\\Documents\\GitHub\\Next\\Clients\\Core\\CacheHelper.cs",
-              "RelativeDocumentMoniker": "Clients\\Core\\CacheHelper.cs",
-              "ToolTip": "C:\\Users\\rocky\\Documents\\GitHub\\Next\\Clients\\Core\\CacheHelper.cs",
-              "RelativeToolTip": "Clients\\Core\\CacheHelper.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAACMAAAAJAAAAAAAAAA==",
+              "DocumentIndex": 2,
+              "Title": "IDatabase.cs",
+              "DocumentMoniker": "C:\\Users\\rocky\\Documents\\GitHub\\Next\\Clients\\IDatabase.cs",
+              "RelativeDocumentMoniker": "Clients\\IDatabase.cs",
+              "ToolTip": "C:\\Users\\rocky\\Documents\\GitHub\\Next\\Clients\\IDatabase.cs",
+              "RelativeToolTip": "Clients\\IDatabase.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAA8AAAASAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-12-31T18:46:33.356Z"
+              "WhenOpened": "2026-02-11T04:37:58.492Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "Base.cs",
+              "DocumentMoniker": "C:\\Users\\rocky\\Documents\\GitHub\\Next\\Clients\\Core\\Base.cs",
+              "RelativeDocumentMoniker": "Clients\\Core\\Base.cs",
+              "ToolTip": "C:\\Users\\rocky\\Documents\\GitHub\\Next\\Clients\\Core\\Base.cs",
+              "RelativeToolTip": "Clients\\Core\\Base.cs",
+              "ViewState": "AgIAADQAAAAAAAAAAAAiwDIBAAAXAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-02-11T02:24:27.079Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
+              "Title": "Ftp.cs",
+              "DocumentMoniker": "C:\\Users\\rocky\\Documents\\GitHub\\Next\\Services\\Ftp.cs",
+              "RelativeDocumentMoniker": "Services\\Ftp.cs",
+              "ToolTip": "C:\\Users\\rocky\\Documents\\GitHub\\Next\\Services\\Ftp.cs",
+              "RelativeToolTip": "Services\\Ftp.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAkAAAAEAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-02-06T07:59:14.161Z"
             }
           ]
         }

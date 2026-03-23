@@ -202,7 +202,7 @@ namespace Next.Services
         }
 
         // ──────────────────────────────────────────────────────────────
-        // SEND EMAIL (unchanged — perfect as-is)
+        // SEND EMAIL
         // ──────────────────────────────────────────────────────────────
         public async Task<EmailResult> SendAsync(
             string to, string subject, string htmlBody,

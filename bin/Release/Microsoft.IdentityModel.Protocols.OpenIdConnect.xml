@@ -714,14 +714,14 @@
             <summary>
             Initializes a new instance of the <see cref="T:Microsoft.IdentityModel.Protocols.OpenIdConnect.OpenIdConnectProtocolException"/> class.
             </summary>
-            <param name="message">Additional information to be included in the exception and displayed to user.</param>
+            <param name="message">Addtional information to be included in the exception and displayed to user.</param>
         </member>
         <member name="M:Microsoft.IdentityModel.Protocols.OpenIdConnect.OpenIdConnectProtocolException.#ctor(System.String,System.Exception)">
             <summary>
             Initializes a new instance of the <see cref="T:Microsoft.IdentityModel.Protocols.OpenIdConnect.OpenIdConnectProtocolException"/> class.
             </summary>
-            <param name="message">Additional information to be included in the exception and displayed to user.</param>
-            <param name="innerException">An <see cref="T:System.Exception"/> that represents the root cause of the exception.</param>
+            <param name="message">Addtional information to be included in the exception and displayed to user.</param>
+            <param name="innerException">A <see cref="T:System.Exception"/> that represents the root cause of the exception.</param>
         </member>
         <member name="M:Microsoft.IdentityModel.Protocols.OpenIdConnect.OpenIdConnectProtocolException.#ctor(System.Runtime.Serialization.SerializationInfo,System.Runtime.Serialization.StreamingContext)">
             <summary>
@@ -744,13 +744,13 @@
             <summary>
             Initializes a new instance of the <see cref="T:Microsoft.IdentityModel.Protocols.OpenIdConnect.OpenIdConnectProtocolInvalidAtHashException"/> class.
             </summary>
-            <param name="message">Additional information to be included in the exception and displayed to user.</param>
+            <param name="message">Addtional information to be included in the exception and displayed to user.</param>
         </member>
         <member name="M:Microsoft.IdentityModel.Protocols.OpenIdConnect.OpenIdConnectProtocolInvalidAtHashException.#ctor(System.String,System.Exception)">
             <summary>
             Initializes a new instance of the <see cref="T:Microsoft.IdentityModel.Protocols.OpenIdConnect.OpenIdConnectProtocolInvalidAtHashException"/> class.
             </summary>
-            <param name="message">Additional information to be included in the exception and displayed to user.</param>
+            <param name="message">Addtional information to be included in the exception and displayed to user.</param>
             <param name="innerException">A <see cref="T:System.Exception"/> that represents the root cause of the exception.</param>
         </member>
         <member name="M:Microsoft.IdentityModel.Protocols.OpenIdConnect.OpenIdConnectProtocolInvalidAtHashException.#ctor(System.Runtime.Serialization.SerializationInfo,System.Runtime.Serialization.StreamingContext)">
@@ -774,14 +774,14 @@
             <summary>
             Initializes a new instance of the <see cref="T:Microsoft.IdentityModel.Protocols.OpenIdConnect.OpenIdConnectProtocolInvalidCHashException"/> class.
             </summary>
-            <param name="message">Additional information to be included in the exception and displayed to user.</param>
+            <param name="message">Addtional information to be included in the exception and displayed to user.</param>
         </member>
         <member name="M:Microsoft.IdentityModel.Protocols.OpenIdConnect.OpenIdConnectProtocolInvalidCHashException.#ctor(System.String,System.Exception)">
             <summary>
             Initializes a new instance of the <see cref="T:Microsoft.IdentityModel.Protocols.OpenIdConnect.OpenIdConnectProtocolInvalidCHashException"/> class.
             </summary>
-            <param name="message">Additional information to be included in the exception and displayed to user.</param>
-            <param name="innerException">An <see cref="T:System.Exception"/> that represents the root cause of the exception.</param>
+            <param name="message">Addtional information to be included in the exception and displayed to user.</param>
+            <param name="innerException">A <see cref="T:System.Exception"/> that represents the root cause of the exception.</param>
         </member>
         <member name="M:Microsoft.IdentityModel.Protocols.OpenIdConnect.OpenIdConnectProtocolInvalidCHashException.#ctor(System.Runtime.Serialization.SerializationInfo,System.Runtime.Serialization.StreamingContext)">
             <summary>
@@ -804,14 +804,14 @@
             <summary>
             Initializes a new instance of the <see cref="T:Microsoft.IdentityModel.Protocols.OpenIdConnect.OpenIdConnectProtocolInvalidNonceException"/> class.
             </summary>
-            <param name="message">Additional information to be included in the exception and displayed to user.</param>
+            <param name="message">Addtional information to be included in the exception and displayed to user.</param>
         </member>
         <member name="M:Microsoft.IdentityModel.Protocols.OpenIdConnect.OpenIdConnectProtocolInvalidNonceException.#ctor(System.String,System.Exception)">
             <summary>
             Initializes a new instance of the <see cref="T:Microsoft.IdentityModel.Protocols.OpenIdConnect.OpenIdConnectProtocolInvalidNonceException"/> class.
             </summary>
-            <param name="message">Additional information to be included in the exception and displayed to user.</param>
-            <param name="innerException">An <see cref="T:System.Exception"/> that represents the root cause of the exception.</param>
+            <param name="message">Addtional information to be included in the exception and displayed to user.</param>
+            <param name="innerException">A <see cref="T:System.Exception"/> that represents the root cause of the exception.</param>
         </member>
         <member name="M:Microsoft.IdentityModel.Protocols.OpenIdConnect.OpenIdConnectProtocolInvalidNonceException.#ctor(System.Runtime.Serialization.SerializationInfo,System.Runtime.Serialization.StreamingContext)">
             <summary>
@@ -834,14 +834,14 @@
             <summary>
             Initializes a new instance of the <see cref="T:Microsoft.IdentityModel.Protocols.OpenIdConnect.OpenIdConnectProtocolInvalidStateException"/> class.
             </summary>
-            <param name="message">Additional information to be included in the exception and displayed to user.</param>
+            <param name="message">Addtional information to be included in the exception and displayed to user.</param>
         </member>
         <member name="M:Microsoft.IdentityModel.Protocols.OpenIdConnect.OpenIdConnectProtocolInvalidStateException.#ctor(System.String,System.Exception)">
             <summary>
             Initializes a new instance of the <see cref="T:Microsoft.IdentityModel.Protocols.OpenIdConnect.OpenIdConnectProtocolInvalidStateException"/> class.
             </summary>
-            <param name="message">Additional information to be included in the exception and displayed to user.</param>
-            <param name="innerException">An <see cref="T:System.Exception"/> that represents the root cause of the exception.</param>
+            <param name="message">Addtional information to be included in the exception and displayed to user.</param>
+            <param name="innerException">A <see cref="T:System.Exception"/> that represents the root cause of the exception.</param>
         </member>
         <member name="M:Microsoft.IdentityModel.Protocols.OpenIdConnect.OpenIdConnectProtocolInvalidStateException.#ctor(System.Runtime.Serialization.SerializationInfo,System.Runtime.Serialization.StreamingContext)">
             <summary>
@@ -1410,7 +1410,7 @@
         </member>
         <member name="M:Microsoft.IdentityModel.Protocols.OpenIdConnect.OpenIdConnectProtocolValidator.ValidateUserInfoResponse(Microsoft.IdentityModel.Protocols.OpenIdConnect.OpenIdConnectProtocolValidationContext)">
             <summary>
-            Validates that an OpenIdConnect response from "userinfo_endpoint" is valid as per <see href="https://openid.net/specs/openid-connect-core-1_0.html"/>.
+            Validates that an OpenIdConnect response from "useinfo_endpoint" is valid as per <see href="https://openid.net/specs/openid-connect-core-1_0.html"/>.
             </summary>
             <param name="validationContext">the <see cref="T:Microsoft.IdentityModel.Protocols.OpenIdConnect.OpenIdConnectProtocolValidationContext"/> that contains expected values.</param>
             <exception cref="T:System.ArgumentNullException">Thrown if <paramref name="validationContext"/> is null.</exception>

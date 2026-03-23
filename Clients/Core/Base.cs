@@ -46,6 +46,11 @@ namespace Next.Clients.Core
         // --------------------------------------------------------------------
         // Constructor with full configurability
         // --------------------------------------------------------------------
+        static Base()
+        {
+            DefaultTypeMap.MatchNamesWithUnderscores = true;
+        }
+
         protected Base(
             DbProviderFactory factory,
             string connectionString,
@@ -139,28 +144,28 @@ namespace Next.Clients.Core
         // --------------------------------------------------------------------
         protected virtual bool IsTransientException(Exception ex)
         {
-            if (ex is TimeoutException or TaskCanceledException)
-                return true;
-            string msg = ex.Message;
-            if (msg.Contains("TIMEOUT", StringComparison.OrdinalIgnoreCase) ||
-            msg.Contains("TRANSIENT", StringComparison.OrdinalIgnoreCase) ||
-            msg.Contains("DEADLOCK", StringComparison.OrdinalIgnoreCase) ||
-            msg.Contains("CONNECTION", StringComparison.OrdinalIgnoreCase) ||
-            msg.Contains("GONE AWAY", StringComparison.OrdinalIgnoreCase) ||
-            msg.Contains("TOO MANY CONNECTIONS", StringComparison.OrdinalIgnoreCase))
-                return true;
-            if (ex.InnerException is { } inner)
+            Exception current = ex;
+
+            while (current != null)
             {
-                if (inner is System.Data.SqlClient.SqlException sqlEx &&
-                new[] { 4060, 40197, 40501, 49918, 49919, 49920 }.Contains(sqlEx.Number))
+                if (current is TimeoutException or TaskCanceledException)
                     return true;
-                if (inner is MySql.Data.MySqlClient.MySqlException mysqlEx &&
-                new[] { 2006, 2013, 2055 }.Contains(mysqlEx.Number))
+
+                if (current is System.Data.SqlClient.SqlException sqlEx &&
+                    new[] { 4060, 40197, 40501, 49918, 49919, 49920 }.Contains(sqlEx.Number))
                     return true;
-                if (inner is Npgsql.PostgresException pgEx &&
-                new[] { "08006", "57P01", "57P02", "57P03", "53300" }.Contains(pgEx.SqlState))
+
+                if (current is MySqlException mysqlEx &&
+                    new[] { 2006, 2013, 2055 }.Contains(mysqlEx.Number))
                     return true;
+
+                if (current is PostgresException pgEx &&
+                    new[] { "08006", "57P01", "57P02", "57P03", "53300" }.Contains(pgEx.SqlState))
+                    return true;
+
+                current = current.InnerException;
             }
+
             return false;
         }
 
@@ -247,7 +252,14 @@ namespace Next.Clients.Core
         {
             while (!_cts.IsCancellationRequested)
             {
-                await Task.Delay(HealthCheckInterval, _cts.Token).ConfigureAwait(false);
+                try
+                {
+                    await Task.Delay(HealthCheckInterval, _cts.Token).ConfigureAwait(false);
+                }
+                catch (TaskCanceledException)
+                {
+                    return;
+                }
 
                 if (DateTime.UtcNow - _lastSuccessUtc < HealthCheckInterval + TimeSpan.FromMinutes(1))
                     continue;
@@ -256,7 +268,10 @@ namespace Next.Clients.Core
                 {
                     await ExecuteWithRetryAsync(async (c, ct) =>
                     {
-                        await c.ExecuteAsync(HealthCheckSql);
+                        await c.ExecuteAsync(new CommandDefinition(
+                            HealthCheckSql,
+                            cancellationToken: ct));
+
                         return true;
                     }, "HEALTH_CHECK");
                 }
@@ -287,76 +302,138 @@ namespace Next.Clients.Core
         // --------------------------------------------------------------------
         // Dapper API - all methods use ExecuteWithRetryAsync
         // --------------------------------------------------------------------
-        public Task<IEnumerable<T>> QueryAsync<T>(string sql, object param = null, int? timeoutSec = null)
+ 
+        public Task<IEnumerable<T>> QueryAsync<T>(
+            string sql,
+            object param = null,
+            int? timeoutSec = null)
         {
             return ExecuteWithRetryAsync(
-                (c, ct) => c.QueryAsync<T>(sql, param, commandTimeout: timeoutSec),
+                (c, ct) => c.QueryAsync<T>(new CommandDefinition(
+                    sql,
+                    param,
+                    commandTimeout: timeoutSec,
+                    cancellationToken: ct)),
                 "QueryAsync",
-                result =>
-                {
-                    int count = result is ICollection<T> col ? col.Count : result.Count();
-                    return $"Loaded {count} rows";
-                });
+                _ => "Query executed");
         }
 
-        public Task<T> QueryFirstOrDefaultAsync<T>(string sql, object param = null, int? timeoutSec = null)
+        public Task<T> QueryFirstOrDefaultAsync<T>(
+            string sql,
+            object param = null,
+            int? timeoutSec = null)
         {
             return ExecuteWithRetryAsync(
-                (c, ct) => c.QueryFirstOrDefaultAsync<T>(sql, param, commandTimeout: timeoutSec),
+                (c, ct) => c.QueryFirstOrDefaultAsync<T>(new CommandDefinition(
+                    sql,
+                    param,
+                    commandTimeout: timeoutSec,
+                    cancellationToken: ct)),
                 "QueryFirstOrDefaultAsync",
-                result => result != null ? "Loaded 1 row" : "Loaded 0 rows");
+                r => r != null ? "Loaded 1 row" : "Loaded 0 rows");
         }
 
-        public Task<int> ExecuteAsync(string sql, object param = null, int? timeoutSec = null)
+        public Task<int> ExecuteAsync(
+            string sql,
+            object param = null,
+            int? timeoutSec = null)
         {
             return ExecuteWithRetryAsync(
-                (c, ct) => c.ExecuteAsync(sql, param, commandTimeout: timeoutSec),
+                (c, ct) => c.ExecuteAsync(new CommandDefinition(
+                    sql,
+                    param,
+                    commandTimeout: timeoutSec,
+                    cancellationToken: ct)),
                 "ExecuteAsync",
-                rowsAffected => $"Affected {rowsAffected} rows");
+                r => $"Affected {r} rows");
         }
 
-        public Task<T> ExecuteScalarAsync<T>(string sql, object param = null, int? timeoutSec = null)
+        public Task<T> ExecuteScalarAsync<T>(
+            string sql,
+            object param = null,
+            int? timeoutSec = null)
         {
             return ExecuteWithRetryAsync(
-                (c, ct) => c.ExecuteScalarAsync<T>(sql, param, commandTimeout: timeoutSec),
-                "ExecuteScalarAsync",
-                 result => result != null ? $"Returned {result}" : "Returned null");
+                (c, ct) => c.ExecuteScalarAsync<T>(new CommandDefinition(
+                    sql,
+                    param,
+                    commandTimeout: timeoutSec,
+                    cancellationToken: ct)),
+                "ExecuteScalarAsync");
         }
 
-        public Task<IEnumerable<T>> QuerySpAsync<T>(string proc, object param = null, int? timeoutSec = null)
+        public Task<IEnumerable<T>> QuerySpAsync<T>(
+            string proc,
+            object param = null,
+            int? timeoutSec = null)
         {
             return ExecuteWithRetryAsync(
-                (c, ct) => c.QueryAsync<T>(proc, param, commandType: System.Data.CommandType.StoredProcedure, commandTimeout: timeoutSec),
+                (c, ct) => c.QueryAsync<T>(new CommandDefinition(
+                    proc,
+                    param,
+                    commandTimeout: timeoutSec,
+                    commandType: System.Data.CommandType.StoredProcedure,
+                    cancellationToken: ct)),
                 "QuerySpAsync",
-                result =>
-                {
-                    int count = result is ICollection<T> col ? col.Count : result.Count();
-                    return $"Loaded {count} rows";
-                });
+                _ => "SP Query executed");
         }
 
-        public Task<T> QuerySpFirstAsync<T>(string proc, object param = null, int? timeoutSec = null)
+        public Task<T> QuerySpFirstAsync<T>(
+            string proc,
+            object param = null,
+            int? timeoutSec = null)
         {
             return ExecuteWithRetryAsync(
-                (c, ct) => c.QueryFirstOrDefaultAsync<T>(proc, param, commandType: System.Data.CommandType.StoredProcedure, commandTimeout: timeoutSec),
+                (c, ct) => c.QueryFirstOrDefaultAsync<T>(new CommandDefinition(
+                    proc,
+                    param,
+                    commandTimeout: timeoutSec,
+                    commandType: System.Data.CommandType.StoredProcedure,
+                    cancellationToken: ct)),
                 "QuerySpFirstAsync",
-                result => result != null ? "Loaded 1 row" : "Loaded 0 rows");
+                r => r != null ? "Loaded 1 row" : "Loaded 0 rows");
         }
 
-        public Task<int> ExecuteSpAsync(string proc, object param = null, int? timeoutSec = null)
+        public Task<int> ExecuteSpAsync(
+            string proc,
+            object param = null,
+            int? timeoutSec = null)
         {
             return ExecuteWithRetryAsync(
-                (c, ct) => c.ExecuteAsync(proc, param, commandType: System.Data.CommandType.StoredProcedure, commandTimeout: timeoutSec),
+                (c, ct) => c.ExecuteAsync(new CommandDefinition(
+                    proc,
+                    param,
+                    commandTimeout: timeoutSec,
+                    commandType: System.Data.CommandType.StoredProcedure,
+                    cancellationToken: ct)),
                 "ExecuteSpAsync",
-                rowsAffected => $"Affected {rowsAffected} rows");
+                r => $"Affected {r} rows");
         }
 
-        public Task TransactAsync(Func<DbConnection, DbTransaction, Task> action, [CallerMemberName] string operationName = "")
+        public Task<T> ExecuteScalarSpAsync<T>(
+            string proc,
+            object param = null,
+            int? timeoutSec = null)
+        {
+            return ExecuteWithRetryAsync(
+                (c, ct) => c.ExecuteScalarAsync<T>(new CommandDefinition(
+                    proc,
+                    param,
+                    commandTimeout: timeoutSec,
+                    commandType: System.Data.CommandType.StoredProcedure,
+                    cancellationToken: ct)),
+                "ExecuteScalarSpAsync");
+        }
+
+        public Task TransactAsync(
+            Func<DbConnection, DbTransaction, Task> action,
+            [CallerMemberName] string operationName = "")
         {
             return ExecuteWithRetryAsync(
                 async (conn, ct) =>
                 {
                     using var tx = conn.BeginTransaction();
+
                     try
                     {
                         await action(conn, tx).ConfigureAwait(false);
@@ -367,12 +444,12 @@ namespace Next.Clients.Core
                         tx.Rollback();
                         throw;
                     }
-                    return true; // no row count for transactions
+
+                    return true;
                 },
                 operationName,
                 _ => "Transaction executed");
         }
-
 
         // --------------------------------------------------------------------
         // Abstract backup method
@@ -384,9 +461,12 @@ namespace Next.Clients.Core
         // --------------------------------------------------------------------
         public void Dispose()
         {
-            _cts.Cancel();
-            try { _healthTask?.Wait(3000); } catch { }
-            _cts.Dispose();
+            if (!_cts.IsCancellationRequested)
+                _cts.Cancel();
+
+            try { _healthTask?.Wait(1000); } catch { }
+                _cts.Dispose();
+
             LogOperation("Dispose", 0, true);
         }
 

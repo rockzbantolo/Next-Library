@@ -30337,6 +30337,13 @@
             <param name="val"></param>
             <returns></returns>
         </member>
+        <member name="M:OfficeOpenXml.FormulaParsing.Excel.Functions.ExcelFunction.IsNumericNotBool(System.Object)">
+            <summary>
+            Is numeric but not bool
+            </summary>
+            <param name="val"></param>
+            <returns></returns>
+        </member>
         <member name="M:OfficeOpenXml.FormulaParsing.Excel.Functions.ExcelFunction.IsBool(System.Object)">
             <summary>
             Is bool
@@ -32540,7 +32547,7 @@
         <member name="T:OfficeOpenXml.FormulaParsing.Exceptions.ExcelErrorValueException">
             <summary>
             This Exception represents an Excel error. When this exception is thrown
-            from an Excel function, the ErrorValue code will be set as the value of the
+            from an Excel function, the Div0Error code will be set as the value of the
             parsed cell.
             </summary>
             <seealso cref="T:OfficeOpenXml.ExcelErrorValue"/>
@@ -33082,7 +33089,7 @@
             <summary>
             Stores the Lambda tokens and can be called multiple times with different parameters. 
             For each time the tokens are converted RPN tokens and runs through the calculation 
-            via the new <see cref="M:OfficeOpenXml.FormulaParsing.RpnFormulaExecution.ExecutePartialFormula(OfficeOpenXml.FormulaParsing.RpnOptimizedDependencyChain,OfficeOpenXml.FormulaParsing.RpnFormula,OfficeOpenXml.FormulaParsing.ExcelCalculationOption,System.Boolean,OfficeOpenXml.FormulaParsing.FormulaExpressions.VariableStorage.VariableStorageScope)"/> method.
+            via the new <see cref="!:RpnFormulaExecution.ExecutePartialFormula(RpnOptimizedDependencyChain, RpnFormula, ExcelCalculationOption, bool, VariableStorageScope)"/> method.
             </summary>
         </member>
         <member name="M:OfficeOpenXml.FormulaParsing.FormulaExpressions.LambdaCalculator.#ctor(System.Collections.Generic.List{OfficeOpenXml.FormulaParsing.LexicalAnalysis.Token},OfficeOpenXml.FormulaParsing.FormulaExpressions.VariableStorage.VariableStorageScope,OfficeOpenXml.FormulaParsing.RpnFormula)">
@@ -34298,6 +34305,16 @@
         <member name="F:OfficeOpenXml.FormulaParsing.LexicalAnalysis.TokenType.EtaReducedLambda">
             <summary>
             Represent a eta Lambda.
+            </summary>
+        </member>
+        <member name="F:OfficeOpenXml.FormulaParsing.LexicalAnalysis.TokenType.Div0Error">
+            <summary>
+            Represents a #Div/0! error
+            </summary>
+        </member>
+        <member name="F:OfficeOpenXml.FormulaParsing.LexicalAnalysis.TokenType.GettingDataError">
+            <summary>
+            Represents a #Getting_Data error
             </summary>
         </member>
         <member name="T:OfficeOpenXml.FormulaParsing.Logging.IFormulaParserLogger">
@@ -47792,6 +47809,11 @@
         <member name="F:OfficeOpenXml.eErrorType.Busy">
             <summary>
             Busy error, waiting for a remote call
+            </summary>
+        </member>
+        <member name="F:OfficeOpenXml.eErrorType.GettingData">
+            <summary>
+            GettingData
             </summary>
         </member>
         <member name="T:OfficeOpenXml.ExcelErrorValue">

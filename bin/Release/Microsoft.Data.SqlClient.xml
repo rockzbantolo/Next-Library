@@ -2216,6 +2216,14 @@
             This app context switch defaults to 'false'.
             </summary>
         </member>
+        <member name="P:Microsoft.Data.SqlClient.LocalAppContextSwitches.EnableMultiSubnetFailoverByDefault">
+            <summary>
+            When set to true, the default value for MultiSubnetFailover connection string property
+            will be true instead of false. This enables parallel IP connection attempts for 
+            improved connection times in multi-subnet environments.
+            This app context switch defaults to 'false'.
+            </summary>
+        </member>
         <member name="M:Microsoft.Data.SqlClient.NoneAttestationEnclaveProvider.InvalidateEnclaveSession(Microsoft.Data.SqlClient.EnclaveSessionParameters,Microsoft.Data.SqlClient.SqlEnclaveSession)">
             <summary>
             When overridden in a derived class, looks up and evicts an enclave session from the enclave session cache, if the provider implements session caching.
@@ -16571,6 +16579,9 @@ Query notifications are supported only for SELECT statements that meet a list of
         When you create a <see cref="T:Microsoft.Data.SqlClient.SqlInfoMessageEventArgs" /> delegate, you identify the method that will handle the event. To associate the event with your event handler, add an instance of the delegate to the event. The event handler is called whenever the event occurs, unless you remove the delegate. For more information about event handler delegates, see <see href="https://learn.microsoft.com/dotnet/standard/events/">Handling and Raising Events</see>.
       </remarks>
         </member>
+        <member name="M:Microsoft.Data.SqlClient.SqlInternalConnection.Deactivate">
+            <inheritdoc/>
+        </member>
         <member name="M:Microsoft.Data.SqlClient.SqlInternalTransaction.GetServerTransactionLevel">
              <summary>
              This function is needed for those times when it is impossible to determine the server's
@@ -24402,6 +24413,9 @@ The following example creates a <xref:Microsoft.Data.SqlClient.SqlConnection>, o
              </para>
              </remarks>
         </member>
+        <member name="M:Microsoft.Data.SqlClient.SqlInternalConnectionTds.ResetConnection">
+            <inheritdoc/>
+        </member>
         <member name="M:Microsoft.Data.SqlClient.SqlInternalConnectionTds.OnFedAuthInfo(Microsoft.Data.SqlClient.SqlFedAuthInfo)">
             <summary>
             Generates (if appropriate) and sends a Federated Authentication Access token to the server, using the Federated Authentication Info.
@@ -24598,6 +24612,12 @@ The following example creates a <xref:Microsoft.Data.SqlClient.SqlConnection>, o
         This exception indicates that an operation has been aborted by the consumer of an API.  For example, if the event handler of the <see cref="E:Microsoft.Data.SqlClient.SqlBulkCopy.SqlRowsCopied" /> event sets the <see cref="P:Microsoft.Data.SqlClient.SqlRowsCopiedEventArgs.Abort" />  property to <see langword="true" /> in the <see cref="T:Microsoft.Data.SqlClient.SqlRowsCopiedEventArgs" /> object passed to the handler, the <see cref="M:Microsoft.Data.SqlClient.SqlBulkCopy.WriteToServer(System.Data.DataTable)" /> method stops sending rows to the server and throws an <see cref="T:Microsoft.Data.OperationAbortedException" /> .
       </remarks>
         </member>
+        <member name="M:Microsoft.Data.ProviderBase.DbConnectionClosed.Deactivate">
+            <inheritdoc/>
+        </member>
+        <member name="M:Microsoft.Data.ProviderBase.DbConnectionClosed.ResetConnection">
+            <inheritdoc/>
+        </member>
         <member name="F:Microsoft.Data.ProviderBase.DbConnectionInternal._owningObject">
             <summary>
             [usage must be thread safe] the owning object, when not in the pool. (both Pooled and Non-Pooled connections)
@@ -24724,6 +24744,13 @@ The following example creates a <xref:Microsoft.Data.SqlClient.SqlConnection>, o
             </summary>
             <param name="connectionPool"></param>
         </member>
+        <member name="M:Microsoft.Data.ProviderBase.DbConnectionInternal.ResetConnection">
+            <summary>
+            Idempotently resets the connection so that it may be recycled without leaking state.
+            May preserve transaction state if the connection is enlisted in a distributed transaction.
+            Should be called before the first action is taken on a recycled connection.
+            </summary>
+        </member>
         <member name="M:Microsoft.Data.ProviderBase.DbConnectionInternal.TryOpenConnection(System.Data.Common.DbConnection,Microsoft.Data.ProviderBase.DbConnectionFactory,System.Threading.Tasks.TaskCompletionSource{Microsoft.Data.ProviderBase.DbConnectionInternal},Microsoft.Data.Common.ConnectionString.DbConnectionOptions)">
             <remarks>
             The default implementation is for the open connection objects, and it simply throws.
@@ -24733,11 +24760,25 @@ The following example creates a <xref:Microsoft.Data.SqlClient.SqlConnection>, o
             for non-pooled connections.
             </remarks>
         </member>
+        <member name="M:Microsoft.Data.ProviderBase.DbConnectionInternal.Activate(System.Transactions.Transaction)">
+            <summary>
+            Activates the connection, preparing it for active use.
+            An activated connection has an owner and is checked out from the connection pool (if pooling is enabled).
+            </summary>
+            <param name="transaction">The transaction in which the connection should enlist.</param>
+        </member>
         <member name="M:Microsoft.Data.ProviderBase.DbConnectionInternal.CleanupTransactionOnCompletion(System.Transactions.Transaction)">
             <summary>
             Cleanup connection's transaction-specific structures (currently used by Delegated transaction).
             This is a separate method because cleanup can be triggered in multiple ways for a delegated
             transaction.
+            </summary>
+        </member>
+        <member name="M:Microsoft.Data.ProviderBase.DbConnectionInternal.Deactivate">
+            <summary>
+            Deactivates the connection, cleaning up any state as necessary.
+            A deactivated connection is one that is no longer in active use and does not have an owner.
+            A deactivated connection may be open (connected to a server) and is checked into the connection pool (if pooling is enabled).
             </summary>
         </member>
         <member name="M:Microsoft.Data.ProviderBase.DbConnectionInternal.DoomThisConnection">
